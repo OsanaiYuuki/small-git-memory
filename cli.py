@@ -5,6 +5,7 @@ def help_info():
     print("commands:")
     print("  add <role> <content>     add a message")
     print("  remove <index>           remove message by index")
+    print("  validate                 validate current context")
     print("  commit <name>            save current context")
     print("  auto                     auto commit current context")
     print("  rollback <name>          rollback to snapshot")
@@ -21,7 +22,19 @@ def help_info():
 
 def run_cli(memory):
     while True:
-        command=input("git memory> ")
+        try:
+            command=input("git memory> ")
+        
+        except KeyboardInterrupt:
+            print()
+            print("exit")
+            break
+        
+        except EOFError:
+            print()
+            print("exit")
+            break
+
         command=command.strip()#清洗输入的作用 去除字符串首尾的空白字符
         
         if command=="":
@@ -40,6 +53,10 @@ def run_cli(memory):
 
         elif command == "log":
             memory.log()
+
+        elif command == "validate":
+            memory.validate_context()
+
 
         elif parts[0]=="diff": #the current workspace and HEAD.
             if len(parts) == 1:

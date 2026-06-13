@@ -24,10 +24,8 @@ class GitMemory:
         removed_message=self.context.pop(real_index)
         print("removed:",removed_message)
 
-        if not self.has_user_message():
-            print("warning: context has no user message")
-        if not self.has_assistant_message():
-            print("warning: context has no assistant message")
+        self.validate_context()
+
     
     def commit(self,name):
         self.snapshots[name]=copy.deepcopy(self.context)
@@ -143,11 +141,30 @@ class GitMemory:
                 return True
         return False
     
-# #def has_user_message(self): sooooooooo Pythonic~~
-#     return any(message.get("role") == "user" for message in self.context)
+    def validate_context(self):
+        if len(self.context) == 0:
+            print("context is empty")
+            return
+        
+        if not self.has_assistant_message():
+            print("warning:context has no assistant message")
+        
+        elif not self.has_user_message():
+            print("warning:context has no user message")
 
-# def has_assistant_message(self):
-#     return any(message.get("role") == "assistant" for message in self.context)
+        for index,message in enumerate(self.context,start=1):
+            if "role" not in message:
+                print("warnging:message",index,"has no role")
+            
+            if "content" not in message:
+                print("warnging:message",index,"has no content")
+
+        print("context validation finished")
+
+
+        
+        
+
 
 
     
