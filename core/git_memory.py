@@ -15,6 +15,10 @@ class GitMemory:
         self.context.append(message)
     
     def remove_message(self,index):
+        if len(self.context) == 0:
+            print("No messages can be deleted")
+            return
+
         real_index=index-1
 
         if real_index <0 or real_index >=len(self.context):
@@ -22,7 +26,8 @@ class GitMemory:
             return
         
         removed_message=self.context.pop(real_index)
-        print("removed:",removed_message)
+        message=removed_message
+        print("remove:",message["role"]+":",message["content"])
 
         self.validate_context()
 
@@ -55,6 +60,7 @@ class GitMemory:
 
         if self.is_dirty():
             print("偏离")
+            self.diff()
         else:
             print("没偏离")
     
@@ -208,7 +214,7 @@ class GitMemory:
         lcs.reverse()
         return lcs
 
-    
+
 
 
 
