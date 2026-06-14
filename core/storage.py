@@ -71,7 +71,7 @@ def validate_data(data):
     if not validate_messages(data["context"]):
         return False
 
-    for name,messages in data["snapshots"].items():
+    for name,messages in data["snapshots"].items(): 
         if not validate_messages(messages):
             print("snapshots is invalid",name)
             return False
