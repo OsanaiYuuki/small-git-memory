@@ -29,19 +29,30 @@ def load_memory(memory):
 
     print("loaded from", DATA_FILE)     
 
+
+def validate_messages(messages):
+    if not isinstance(messages, list):
+        print("message is not a list:",messages)
+        return False
+    
+    for message in messages:
+        if not isinstance(message,dict):
+            print("message is not a dict:",message)
+            return False
+        if "role" not in message or "content" not in message:
+            print("message missing role or content",message)
+            return False
+    return True
+
+
 def validate_data(data):
     required_keys=["context","snapshots","head","commit_count"]
         #The key required for a valid JSON
-        
+
     for key in required_keys:
         if key not in data:
             print("data file missing key:",key)
             return  False
-
-    if not isinstance(data["context"],list):
-        print("context must be a list")
-        return False
-    
     
     if not isinstance(data["snapshots"],dict):
         print("snapshots must be a dict")
@@ -57,6 +68,15 @@ def validate_data(data):
         print("commit_count must be an int")
         return False
     
+    if not validate_messages(data["context"]):
+        return False
+
+    for name,messages in data["snapshots"].items():
+        if not validate_messages(messages):
+            print("snapshots is invalid",name)
+            return False
+
+
     return True
 
 def memory_to_data(memory):#这里指 把memory的属性抽象成一个方法 直接返回一个值 让data接收
