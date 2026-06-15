@@ -95,7 +95,7 @@ def run_cli(memory):
                 continue
             
             name=parts[1]
-            memory.commit(name)
+            memory.snapshot(name)
 
         elif parts[0]=="rollback":
             if len(parts)<2:

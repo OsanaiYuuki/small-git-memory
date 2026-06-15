@@ -76,7 +76,7 @@ def validate_data(data):
             print("snapshot should be a dict")
             return False
         
-        required_snapshots_keys=["messages","created_at","note"]
+        required_snapshots_keys=["messages","created_at","note","index"] #对应着snapshots的结构 
 
         for key in required_snapshots_keys:
             if key not in snapshot:

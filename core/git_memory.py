@@ -10,14 +10,16 @@ DEFAULT_CONTEXT=[
 
 class GitMemory:
     def __init__(self):
-        self.head=None
-        self.context=copy.deepcopy(DEFAULT_CONTEXT)
-       
-        self.snapshots={} #完整context
-        self.commit_count=0
         
-        self.commits=[]#存的是patch增量 
+       
+        self.snapshots={} #书签
+        
+        self.commits={}#树容器
+        self.next_id=0#id 发送器
         self.base=copy.deepcopy(DEFAULT_CONTEXT)
+        self.context=copy.deepcopy(DEFAULT_CONTEXT)
+
+        self._create_root()   
 
     
     def add_message(self,role:str,content:str)->None:
@@ -42,7 +44,7 @@ class GitMemory:
         self.validate_context()
 
     
-    def commit(self,name:str, note:str="")->None:
+    def snapshot(self,name:str, note:str="")->None:
         if name in self.snapshots:
             print("The name already exists!")
             return
@@ -50,14 +52,15 @@ class GitMemory:
         self.snapshots[name]={
             "messages": copy.deepcopy(self.context),
             "created_at":datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "note":note
+            "note":note,
+            "node_id":self.head
         }
-        self.head=name
-        self.commit_count+=1 
+        
+        
         
     def auto_commit(self):#自动起名字
-        name="checkpoint_"+str(self.commit_count+1)
-        self.commit(name)
+        name="checkpoint_"+str(len(self.snapshots))
+        self.snapshot(name)
         print("auto commit:",name)
     
     def rollback(self,name:str)->None:#判断函数只返回结果 无需打印
@@ -177,14 +180,47 @@ class GitMemory:
 
         print("context validation finished")
 
-    def record(self): #commit_patch
+    
+    def commit(self): #commit_patch
+        if self.base == self.context:return
+
         patch=make_patch(self.base,self.context)
 
-        if self.base == self.context:
-            return None
-        self.commits.append(patch)
-        self.base=copy.deepcopy(self.context)          #if not base 还停在上一笔
+        new_id=self.next_id
+        self.commits[new_id]={
+            "id": new_id,
+            "parent":self.head,
+            "patch":patch,
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
 
+        self.next_id += 1
+        self.head=new_id # HEAD 移到新节点
+        self.base=copy.deepcopy(self.context)
+
+    
+    def _create_root(self):
+        root_id=self.next_id #0
+
+        self.commits[root_id]={
+            "id":root_id,
+            "parent":None, #根没有父亲 :(
+            "patch":[],
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        self.next_id += 1 #id迭代
+        self.head = root_id#HEAD站在根上
+
+        self.snapshots["__root__"]={
+            "messages":copy.deepcopy(DEFAULT_CONTEXT),
+            "created_at":datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "note":"System Root Node",
+            "node_id":root_id   #就像贴纸 贴在根节点0上 作为索引
+        }
+
+
+
+        
 
     
 
