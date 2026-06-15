@@ -1,21 +1,30 @@
 import copy
 from core.diff import show_diff
+from datetime import datetime
+from core.patch import make_patch
+
+DEFAULT_CONTEXT=[ 
+            {"role":"user","content":"comeback"},
+            {"role":"assistant","content":"ok go"}
+        ]
 
 class GitMemory:
     def __init__(self):
         self.head=None
-        self.context=[ 
-            {"role":"user","content":"comeback"},
-            {"role":"assistant","content":"ok go"}
-        ]
-        self.snapshots={}
+        self.context=copy.deepcopy(DEFAULT_CONTEXT)
+       
+        self.snapshots={} #完整context
         self.commit_count=0
+        
+        self.commits=[]#存的是patch增量 
+        self.base=copy.deepcopy(DEFAULT_CONTEXT)
+
     
-    def add_message(self,role,content):
+    def add_message(self,role:str,content:str)->None:
         message={"role":role,"content":content}
         self.context.append(message)
     
-    def remove_message(self,index):
+    def remove_message(self,index:int)->None:
         if len(self.context) == 0:
             print("No messages can be deleted")
             return
@@ -33,12 +42,16 @@ class GitMemory:
         self.validate_context()
 
     
-    def commit(self,name):
+    def commit(self,name:str, note:str="")->None:
         if name in self.snapshots:
             print("The name already exists!")
             return
         
-        self.snapshots[name]=copy.deepcopy(self.context)
+        self.snapshots[name]={
+            "messages": copy.deepcopy(self.context),
+            "created_at":datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "note":note
+        }
         self.head=name
         self.commit_count+=1 
         
@@ -47,12 +60,12 @@ class GitMemory:
         self.commit(name)
         print("auto commit:",name)
     
-    def rollback(self,name):#判断函数只返回结果 无需打印
+    def rollback(self,name:str)->None:#判断函数只返回结果 无需打印
         if name not in self.snapshots:
             print("snapshots not exist:",name)
             return
     
-        self.context=copy.deepcopy(self.snapshots[name])
+        self.context=copy.deepcopy(self.snapshots[name]["messages"])
         self.head=name
 
     def status(self):#显示函数负责打印结果。
@@ -77,12 +90,22 @@ class GitMemory:
                 #is_dirty的意思是判断当前context有无偏离head指向的快照
         if self.head is None:
             return len(self.context)>0
-        return self.context!=self.snapshots[self.head]
+        return self.context!=self.snapshots[self.head]["messages"]
     
-    def log(self):#后进先出 乐事薯片
+    def log(self):#后进先出
         print("snapshots:")
+        
         for name in self.snapshots:
-            print(" ",name)
+            snapshot=self.snapshots[name]
+            messages_count=len(snapshot["messages"])
+            now_time=snapshot["created_at"]
+            note=snapshot["note"]
+            
+            print(f"{name} ({now_time}  {messages_count}  messages)")
+            print(f"   note:{note}")
+            
+           
+            
             if name == self.head:
                 print("now in this snapshots:",name)
 
@@ -92,7 +115,7 @@ class GitMemory:
             print(self.context)
             return
         
-        old_context=self.snapshots[self.head]
+        old_context=self.snapshots[self.head]["messages"]
         new_context=self.context
 
         print("diff from head:",self.head)
@@ -107,8 +130,8 @@ class GitMemory:
             print("new snapshots not exists")
             return
         
-        old_context=self.snapshots[old_name]
-        new_context=self.snapshots[new_name]
+        old_context=self.snapshots[old_name]["messages"]
+        new_context=self.snapshots[new_name]["messages"]
 
         print("diff",old_name,"->",new_name)
         show_diff(old_context,new_context)   
@@ -153,6 +176,15 @@ class GitMemory:
                 print("warnging:message",index,"has no content")
 
         print("context validation finished")
+
+    def record(self): #commit_patch
+        patch=make_patch(self.base,self.context)
+
+        if self.base == self.context:
+            return None
+        self.commits.append(patch)
+        self.base=copy.deepcopy(self.context)          #if not base 还停在上一笔
+
 
     
 

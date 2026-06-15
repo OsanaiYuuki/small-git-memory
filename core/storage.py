@@ -23,7 +23,7 @@ def load_memory(memory):
         return
     
     if not validate_data(data):
-        return False
+        return 
     
     apply_data_to_memory(memory,data)
 
@@ -71,9 +71,21 @@ def validate_data(data):
     if not validate_messages(data["context"]):
         return False
 
-    for name,messages in data["snapshots"].items(): 
-        if not validate_messages(messages):
-            print("snapshots is invalid",name)
+    for name,snapshot in data["snapshots"].items(): 
+        if not isinstance(snapshot,dict):
+            print("snapshot should be a dict")
+            return False
+        
+        required_snapshots_keys=["messages","created_at","note"]
+
+        for key in required_snapshots_keys:
+            if key not in snapshot:
+                print("snapshots file missing key:",key)
+                return False
+        
+
+        if not validate_messages(snapshot["messages"]):
+            print("snapshots is invalid",snapshot)
             return False
 
 
