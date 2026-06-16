@@ -1,7 +1,7 @@
 import copy
 from core.diff import show_diff
 from datetime import datetime
-from core.patch import make_patch
+from core.patch import make_patch, apply_patch
 
 DEFAULT_CONTEXT=[ 
             {"role":"user","content":"comeback"},
@@ -63,13 +63,15 @@ class GitMemory:
         self.snapshot(name)
         print("auto commit:",name)
     
-    def rollback(self,name:str)->None:#判断函数只返回结果 无需打印
-        if name not in self.snapshots:
-            print("snapshots not exist:",name)
+    def rollback(self,node_id:int)->None:#判断函数只返回结果 无需打印
+        if node_id not in self.commits:
+            print("id is not exist",node_id)
             return
-    
-        self.context=copy.deepcopy(self.snapshots[name]["messages"])
-        self.head=name
+
+        self.head=node_id
+        self.context=self._rebuild(node_id)
+        self.base=copy.deepcopy(self.context)
+
 
     def status(self):#显示函数负责打印结果。
         print("head",self.head)
@@ -199,7 +201,7 @@ class GitMemory:
         self.base=copy.deepcopy(self.context)
 
     
-    def _create_root(self):
+    def _create_root(self):#定义最初的根
         root_id=self.next_id #0
 
         self.commits[root_id]={
@@ -217,6 +219,39 @@ class GitMemory:
             "note":"System Root Node",
             "node_id":root_id   #就像贴纸 贴在根节点0上 作为索引
         }
+
+    def _find_snapshot_by_node(self,node_id):#辅助 如何找到snapshot
+        for snap in self.snapshots.values():
+            if node_id == snap["node_id"]:
+                return copy.deepcopy(snap["messages"])
+        return None
+    
+    def _rebuild(self,node_id):
+        patches=[] #往上爬时收集 patch 倒序
+        current=node_id
+
+        while True:
+            start_state=self._find_snapshot_by_node(current)#文本
+            if start_state is not None:
+                break #找到起点 snapshot
+            node=self.commits[current] #没找到 把当前的patch收起来
+            patches.append(node["patch"])
+            current=node["parent"]
+
+        patches.reverse()#反转
+
+        state=start_state
+        for patch in patches:
+            state=apply_patch(state,patch)
+
+        return state
+        
+
+
+
+
+
+
 
 
 
