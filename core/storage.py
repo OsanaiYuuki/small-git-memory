@@ -46,61 +46,68 @@ def validate_messages(messages):
 
 
 def validate_data(data):
-    required_keys=["context","snapshots","head","commit_count"]
+    required_keys=["context","base","head","commits","snapshots","next_id"]
         #The key required for a valid JSON
 
     for key in required_keys:
         if key not in data:
             print("data file missing key:",key)
             return  False
-    
+
     if not isinstance(data["snapshots"],dict):
         print("snapshots must be a dict")
         return False
-    
-    
-    if data["head"] is not None and not isinstance(data["head"],str):
-        print("head must be a string or None")
+
+    if not isinstance(data["commits"],dict):
+        print("commits must be a dict")
+        return False
+
+    if not isinstance(data["head"],int):
+        print("head must be an int (node id)")
         return  False
 
-    
-    if not isinstance(data["commit_count"],int):
-        print("commit_count must be an int")
+    if not isinstance(data["next_id"],int):
+        print("next_id must be an int")
         return False
-    
+
     if not validate_messages(data["context"]):
         return False
 
-    for name,snapshot in data["snapshots"].items(): 
+    if not validate_messages(data["base"]):
+        return False
+
+    for name,snapshot in data["snapshots"].items():
         if not isinstance(snapshot,dict):
             print("snapshot should be a dict")
             return False
-        
-        required_snapshots_keys=["messages","created_at","note","index"] #对应着snapshots的结构 
+
+        required_snapshots_keys=["messages","created_at","note","node_id"] #对应snapshots结构
 
         for key in required_snapshots_keys:
             if key not in snapshot:
                 print("snapshots file missing key:",key)
                 return False
-        
 
         if not validate_messages(snapshot["messages"]):
             print("snapshots is invalid",snapshot)
             return False
 
-
     return True
 
-def memory_to_data(memory):#这里指 把memory的属性抽象成一个方法 直接返回一个值 让data接收
+def memory_to_data(memory):#把memory的属性抽象成一个dict返回 让data接收
     return{
         "context":memory.context,
-        "snapshots":memory.snapshots,
+        "base":memory.base,
         "head":memory.head,
-        "commit_count":memory.commit_count
+        "commits":memory.commits,
+        "snapshots":memory.snapshots,
+        "next_id":memory.next_id
     }
 
 def apply_data_to_memory(memory,data):#将data的数据加载到memory对象中 所以是load
-    memory.context = data["context"]
+    memory.context   = data["context"]
+    memory.base      = data["base"]
+    memory.head      = data["head"]
     memory.snapshots = data["snapshots"]
-    memory.head = data["head"]
-    memory.commit_count = data["commit_count"]
+    memory.next_id   = data["next_id"]
+    memory.commits   ={int(k): v for k, v in data["commits"].items()} # 只有 commits 的键要从字符串转回整数

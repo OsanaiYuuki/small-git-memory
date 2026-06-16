@@ -1,3 +1,6 @@
+import sys
+sys.stdout.reconfigure(encoding="utf-8")
+
 from core.git_memory import GitMemory
 from cli import run_cli
 

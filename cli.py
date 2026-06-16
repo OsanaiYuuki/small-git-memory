@@ -8,7 +8,8 @@ def help_info():
     print("  validate                 validate current context")
     print("  commit <name>            save current context")
     print("  auto                     auto commit current context")
-    print("  rollback <name>          rollback to snapshot")
+    print("  rollback <node_id>       rollback to a commit node")
+    print("  undo                     undo to parent node (撤销上一步)")
     print("  show                     show current context")
     print("  status                   show current status")
     print("  log                      show snapshots")
@@ -99,11 +100,19 @@ def run_cli(memory):
 
         elif parts[0]=="rollback":
             if len(parts)<2:
-                print("usage:rollback<name>")
+                print("usage:rollback<node_id>")
                 continue
-            
-            name=parts[1]
-            memory.rollback(name)
+
+            try:
+                node_id=int(parts[1])
+            except ValueError:
+                print("node_id must be a number")
+                continue
+
+            memory.rollback(node_id)
+
+        elif command == "undo":
+            memory.undo()
 
         elif command == "save":
             save_memory(memory)

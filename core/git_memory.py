@@ -25,6 +25,7 @@ class GitMemory:
     def add_message(self,role:str,content:str)->None:
         message={"role":role,"content":content}
         self.context.append(message)
+        self.commit()#每次添加自动保存
     
     def remove_message(self,index:int)->None:
         if len(self.context) == 0:
@@ -42,6 +43,7 @@ class GitMemory:
         print("remove:",message["role"]+":",message["content"])
 
         self.validate_context()
+        self.commit()#每次删除自动存档  this is good 
 
     
     def snapshot(self,name:str, note:str="")->None:
@@ -68,20 +70,25 @@ class GitMemory:
             print("id is not exist",node_id)
             return
 
-        self.head=node_id
-        self.context=self._rebuild(node_id)
-        self.base=copy.deepcopy(self.context)
+        self.head=node_id#移脚
+        self.context=self._rebuild(node_id)#重建
+        self.base=copy.deepcopy(self.context)#重置base
 
 
     def status(self):#显示函数负责打印结果。
-        print("head",self.head)
-        print("context",self.context)
+        print("HEAD 节点:",self.head)
+        print("树节点总数:",len(self.commits))
+        print("书签(snapshot)数:",len(self.snapshots))
 
-        if self.is_dirty():
-            print("偏离")
-            self.diff()
+        drift=self.commits_since_snapshots()
+        if drift == 0:
+            print("当前正好在一个书签上")
         else:
-            print("没偏离")
+            print(f"距离最近的书签已经 {drift} 次 commit —— 要不要打个书签(snapshot)保存一下?")
+
+        print("当前 context:")
+        for index, message in enumerate(self.context,start=1):
+            print(" ",index,message["role"]+":",message["content"])
     
     def show_context(self):
         print("context:")
@@ -91,12 +98,6 @@ class GitMemory:
 
 
 
-    def is_dirty(self): #is_dirty的意思是 true为偏离 
-                #is_dirty的意思是判断当前context有无偏离head指向的快照
-        if self.head is None:
-            return len(self.context)>0
-        return self.context!=self.snapshots[self.head]["messages"]
-    
     def log(self):#后进先出
         print("snapshots:")
         
@@ -111,19 +112,14 @@ class GitMemory:
             
            
             
-            if name == self.head:
+            if snapshot["node_id"] == self.head:
                 print("now in this snapshots:",name)
 
-    def diff(self):#这个函数是用来比较当前快照 和 context内容的区别 告诉变了什么
-        if self.head is None:
-            print("当前还没有创建快照,当前context都是新增内容")
-            print(self.context)
-            return
-        
-        old_context=self.snapshots[self.head]["messages"]
+    def diff(self):#比较当前 context 和它该在的位置(base=当前HEAD节点状态)有什么区别
+        old_context=self.base
         new_context=self.context
 
-        print("diff from head:",self.head)
+        print("diff from HEAD node:",self.head)
         show_diff(old_context,new_context)
 
 
@@ -142,11 +138,13 @@ class GitMemory:
         show_diff(old_context,new_context)   
 
 
-    def clear(self):
-        self.head=None
-        self.context=[]
+    def clear(self):#直接回退至初始状态
         self.snapshots={}
-        self.commit_count=0
+        self.commits={}
+        self.next_id=0
+        self.base = copy.deepcopy(DEFAULT_CONTEXT)
+        self.context = copy.deepcopy(DEFAULT_CONTEXT)
+        self._create_root()        # 造根 head=0 根snopshat
         print("memory cleared")
 
     def has_user_message(self):
@@ -220,7 +218,7 @@ class GitMemory:
             "node_id":root_id   #就像贴纸 贴在根节点0上 作为索引
         }
 
-    def _find_snapshot_by_node(self,node_id):#辅助 如何找到snapshot
+    def _find_snapshot_by_node(self,node_id):#辅助 如何找到snapshot id
         for snap in self.snapshots.values():
             if node_id == snap["node_id"]:
                 return copy.deepcopy(snap["messages"])
@@ -247,7 +245,24 @@ class GitMemory:
         return state
         
 
+    def undo(self):#undo的颗粒度是每次对话 用户的输入 模型的输出
+        parent =self.commits[self.head]["parent"]  #当前节点的父亲
+        if parent is None:                         #代表当前节点是根节点
+            print("It is already in its initial state and cannot be undone")
+            return
+        self.rollback(parent)
+        print("已撤销到节点",parent)
 
+    
+    def commits_since_snapshots(self):
+        current=self.head  #当前的id
+        count=0
+        while True:
+            snap=self._find_snapshot_by_node(current)
+            if snap is not None:
+                return count
+            count +=1
+            current=self.commits[current]["parent"]
 
 
 
