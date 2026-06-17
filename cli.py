@@ -7,6 +7,7 @@ def help_info():
     print("  remove <index>           remove message by index")
     print("  validate                 validate current context")
     print("  commit <name>            save current context")
+    print("  delete_snapshot <name>   delete a snapshot")
     print("  auto                     auto commit current context")
     print("  rollback <node_id>       rollback to a commit node")
     print("  undo                     undo to parent node (撤销上一步)")
@@ -97,6 +98,14 @@ def run_cli(memory):
             
             name=parts[1]
             memory.snapshot(name)
+
+        elif parts[0] == "delete_snapshot":
+            if len(parts) < 2:
+                print("usage:delete_snapshot<name>")
+                continue
+
+            name = parts[1]
+            memory.delete_snapshot(name)
 
         elif parts[0]=="rollback":
             if len(parts)<2:

@@ -11,7 +11,6 @@ DEFAULT_CONTEXT=[
 class GitMemory:
     def __init__(self):
         
-       
         self.snapshots={} #书签
         
         self.commits={}#树容器
@@ -58,6 +57,15 @@ class GitMemory:
             "node_id":self.head
         }
         
+    def delete_snapshot(self,name):
+        if name == "__root__":
+            print("root snapshot can not be deleted")
+            return
+        if name not in self.snapshots:
+            print("snapshot not exist:",name)
+            return
+        del self.snapshots[name]
+        print("snapshot deleted:",name)
         
         
     def auto_commit(self):#自动起名字
@@ -101,8 +109,7 @@ class GitMemory:
     def log(self):#后进先出
         print("snapshots:")
         
-        for name in self.snapshots:
-            snapshot=self.snapshots[name]
+        for name,snapshot in self.snapshots.items(): 
             messages_count=len(snapshot["messages"])
             now_time=snapshot["created_at"]
             note=snapshot["note"]
@@ -115,11 +122,13 @@ class GitMemory:
             if snapshot["node_id"] == self.head:
                 print("now in this snapshots:",name)
 
-    def diff(self):#比较当前 context 和它该在的位置(base=当前HEAD节点状态)有什么区别
-        old_context=self.base
+    def diff(self):
+        names,snapshot=self._find_nearest_snapshot()
+        old_context=snapshot["messages"]
         new_context=self.context
 
-        print("diff from HEAD node:",self.head)
+        print("diff from nearest snapshot:", ", ".join(names))
+
         show_diff(old_context,new_context)
 
 
@@ -218,12 +227,14 @@ class GitMemory:
             "node_id":root_id   #就像贴纸 贴在根节点0上 作为索引
         }
 
+
     def _find_snapshot_by_node(self,node_id):#辅助 如何找到snapshot id
         for snap in self.snapshots.values():
             if node_id == snap["node_id"]:
                 return copy.deepcopy(snap["messages"])
         return None
     
+
     def _rebuild(self,node_id):
         patches=[] #往上爬时收集 patch 倒序
         current=node_id
@@ -254,7 +265,7 @@ class GitMemory:
         print("已撤销到节点",parent)
 
     
-    def commits_since_snapshots(self):
+    def commits_since_snapshots(self):#这就是向上找parents的函数
         current=self.head  #当前的id
         count=0
         while True:
@@ -263,6 +274,30 @@ class GitMemory:
                 return count
             count +=1
             current=self.commits[current]["parent"]
+
+
+    def _find_nearest_snapshot(self): #从当前的self.head向上爬 直到遇见最近的snopshot 返回 #找最近书签的写法
+        current=self.head
+
+        while True:
+            names=[]#这里存放的是一个commit节点 可能有很多snapshot贴纸的名字
+            found_snapshot=None
+
+            for name,snapshot in self.snapshots.items(): #遍历所有的snapshots
+                if current == snapshot["node_id"]:
+                    names.append(name)
+                    found_snapshot=snapshot
+           
+            if names:    #如果列表不为空  == if len(names)>0
+                return names,found_snapshot
+            current = self.commits[current]["parent"] #拿到父节点 
+
+        
+        
+        
+        
+        
+
 
 
 
