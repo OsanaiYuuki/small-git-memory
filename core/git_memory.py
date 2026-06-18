@@ -56,6 +56,8 @@ class GitMemory:
             "note":note,
             "node_id":self.head
         }
+        print(f"snapshot created: {name} on node {self.head}")
+
         
     def delete_snapshot(self,name):
         if name == "__root__":
@@ -68,12 +70,19 @@ class GitMemory:
         print("snapshot deleted:",name)
         
         
-    def auto_commit(self):#自动起名字
-        name="checkpoint_"+str(len(self.snapshots))
+    def auto_snapshot(self):#自动起名字
+        index=1
+        while True:
+            name="checkpoint_"+str(index)
+
+            if name not in self.snapshots:
+                break
+            index+=1
         self.snapshot(name)
-        print("auto commit:",name)
+        
+                    
     
-    def rollback(self,node_id:int)->None:#判断函数只返回结果 无需打印
+    def rollback(self,node_id:int)->None:
         if node_id not in self.commits:
             print("id is not exist",node_id)
             return
@@ -81,6 +90,14 @@ class GitMemory:
         self.head=node_id#移脚
         self.context=self._rebuild(node_id)#重建
         self.base=copy.deepcopy(self.context)#重置base
+
+    def rollback_snapshot(self,name:str):
+        if name not in self.snapshots:
+            print("no name can rollback:",name)
+            return
+        
+        node_id=self.snapshots[name]["node_id"]
+        self.rollback(node_id)
 
 
     def status(self):#显示函数负责打印结果。
@@ -121,6 +138,30 @@ class GitMemory:
             
             if snapshot["node_id"] == self.head:
                 print("now in this snapshots:",name)
+
+    def history(self):#展示历史节点，snapshot
+       
+        print("commits:")
+
+        for node_id,node in self.commits.items():
+            marker=" "#显示标记
+            
+            names=[]#显示snapshot分组
+            for name,snapshot in self.snapshots.items():
+                if snapshot["node_id"]==node_id:
+                    names.append(name)
+            if names:
+                snapshot_text = ", ".join(names)
+            else:
+                snapshot_text = "-"
+            if node_id == self.head:
+                marker="*"
+    
+            commit_id=node["id"]
+            parent=node["parent"]
+            
+            print(f"{marker} id={commit_id} parent={parent} snapshots={snapshot_text}")
+
 
     def diff(self):
         names,snapshot=self._find_nearest_snapshot()

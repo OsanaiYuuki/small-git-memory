@@ -1,19 +1,22 @@
 from core.git_memory import GitMemory
 from core.storage import save_memory, load_memory
 
+memory=GitMemory()
 def help_info():
     print("commands:")
     print("  add <role> <content>     add a message")
     print("  remove <index>           remove message by index")
     print("  validate                 validate current context")
-    print("  commit <name>            save current context")
+    print("  snapshot <name>          save current context,save a snapshot")
     print("  delete_snapshot <name>   delete a snapshot")
-    print("  auto                     auto commit current context")
+    print("  auto                     auto create a snapshot")
     print("  rollback <node_id>       rollback to a commit node")
+    print("  rollback_snapshot <name> rollback to a snapshot")
     print("  undo                     undo to parent node (撤销上一步)")
     print("  show                     show current context")
     print("  status                   show current status")
     print("  log                      show snapshots")
+    print("  history                  show commit tree nodes ")
     print("  save                     save data to file")
     print("  clear                    Only clear memory")
     print("  all_clear                clear all memory")
@@ -56,6 +59,9 @@ def run_cli(memory):
         elif command == "log":
             memory.log()
 
+        elif command == "history":
+            memory.history()
+
         elif command == "validate":
             memory.validate_context()
 
@@ -91,9 +97,9 @@ def run_cli(memory):
 
             memory.remove_message(index)
 
-        elif parts[0]=="commit":
+        elif parts[0]=="snapshot":
             if len(parts)<2:
-                print("usage:commit<name>")
+                print("usage:snapshot<name>")
                 continue
             
             name=parts[1]
@@ -120,6 +126,15 @@ def run_cli(memory):
 
             memory.rollback(node_id)
 
+        elif parts[0]=="rollback_snapshot":
+            if len(parts)<2:
+                print("usage:rollback_snapshot<name>")
+                continue
+            
+            name=parts[1]
+            memory.rollback_snapshot(name)
+        
+        
         elif command == "undo":
             memory.undo()
 
@@ -127,7 +142,7 @@ def run_cli(memory):
             save_memory(memory)
         
         elif command == "auto":
-            memory.auto_commit()
+            memory.auto_snapshot()
 
         elif command == "clear":
              memory.clear()   

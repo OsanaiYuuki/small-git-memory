@@ -61,13 +61,16 @@ def validate_data(data):
     if not isinstance(data["commits"],dict):
         print("commits must be a dict")
         return False
-
+    
     if not isinstance(data["head"],int):
         print("head must be an int (node id)")
         return  False
 
     if not isinstance(data["next_id"],int):
         print("next_id must be an int")
+        return False
+
+    if not validate_data_commits(data):
         return False
 
     if not validate_messages(data["context"]):
@@ -87,6 +90,14 @@ def validate_data(data):
             if key not in snapshot:
                 print("snapshots file missing key:",key)
                 return False
+        if not isinstance(snapshot["node_id"], int):
+            print("snapshot node_id must be an int:", name)
+            return False
+
+        if str(snapshot["node_id"]) not in data["commits"]:
+            print("snapshot points to missing node:", name)
+            return False
+            
 
         if not validate_messages(snapshot["messages"]):
             print("snapshots is invalid",snapshot)
@@ -111,3 +122,42 @@ def apply_data_to_memory(memory,data):#将data的数据加载到memory对象中 
     memory.snapshots = data["snapshots"]
     memory.next_id   = data["next_id"]
     memory.commits   ={int(k): v for k, v in data["commits"].items()} # 只有 commits 的键要从字符串转回整数
+
+def validate_data_commits(data):
+    required_commit_key=["id","parent","patch","created_at"]
+
+    if str(data["head"])not in data["commits"]:
+        print("head node not exist")
+        return False
+    for commit_id,node in data["commits"].items():
+        if not isinstance(node,dict):
+            print("commit node must be a dict:",commit_id)
+            return False
+        
+        for key in required_commit_key:
+            if key not in node:
+                print("commit missing key:",key)
+                return False
+        if not isinstance(node["id"], int):
+            print("commit id must be an int:", commit_id)
+            return False
+
+        if str(node["id"]) != commit_id:
+            print("commit key and id mismatch:", commit_id)
+            return False
+
+        if not isinstance(node["patch"], list):
+            print("commit patch must be a list:", commit_id)
+            return False
+
+        parent = node["parent"]
+
+        if parent is not None and not isinstance(parent, int):
+            print("commit parent must be None or int:", commit_id)
+            return False
+
+        if parent is not None and str(parent) not in data["commits"]:
+            print("commit parent not exist:", commit_id)
+            return False
+
+    return True
