@@ -1,6 +1,9 @@
-import json
+import json 
 import os
 from config import DATA_FILE
+from core.models import commit_from_data, commit_to_data, messages_from_data, messages_to_data, snapshot_from_data, snapshot_to_data
+
+STORAGE_VERSION = 1
 
 def save_memory(memory):
     data=memory_to_data(memory)
@@ -22,6 +25,11 @@ def load_memory(memory):
         print("data file is not valid json:",DATA_FILE)
         return
     
+    data = migrate_data(data)
+    
+    if data is None:
+        return
+
     if not validate_data(data):
         return 
     
@@ -46,7 +54,13 @@ def validate_messages(messages):
 
 
 def validate_data(data):
-    required_keys=["context","base","head","commits","snapshots","next_id"]
+    version = get_storage_version(data)
+
+    if version!=STORAGE_VERSION:
+        print("unsupported storage version:", version)
+        return False
+
+    required_keys=["version","context","base","head","commits","snapshots","next_id"]
         #The key required for a valid JSON
 
     for key in required_keys:
@@ -78,18 +92,24 @@ def validate_data(data):
 
     if not validate_messages(data["base"]):
         return False
+    
+    
+
 
     for name,snapshot in data["snapshots"].items():
         if not isinstance(snapshot,dict):
             print("snapshot should be a dict")
             return False
 
-        required_snapshots_keys=["messages","created_at","note","node_id"] #对应snapshots结构
+        required_snapshots_keys=["created_at","note","node_id"] #对应snapshots结构
 
         for key in required_snapshots_keys:
             if key not in snapshot:
                 print("snapshots file missing key:",key)
                 return False
+        if "cached_context" not in snapshot and "messages" not in snapshot:
+            print("snapshot missing cached_context:", name)
+            return False
         if not isinstance(snapshot["node_id"], int):
             print("snapshot node_id must be an int:", name)
             return False
@@ -99,29 +119,39 @@ def validate_data(data):
             return False
             
 
-        if not validate_messages(snapshot["messages"]):
-            print("snapshots is invalid",snapshot)
+        cached_context=snapshot.get("cached_context", snapshot.get("messages"))
+        if cached_context is not None and not validate_messages(cached_context):
+            print("snapshot cached_context is invalid",snapshot)
             return False
 
     return True
 
 def memory_to_data(memory):#把memory的属性抽象成一个dict返回 让data接收
+    commits={}
+    for commit_id,node in memory.commits.items():
+        commits[str(commit_id)] = commit_to_data(node)
+
+    snapshots={}
+    for name,snapshot in memory.snapshots.items():
+        snapshots[name]=snapshot_to_data(snapshot)
+
     return{
-        "context":memory.context,
-        "base":memory.base,
+        "version":STORAGE_VERSION,
+        "context":messages_to_data(memory.context),
+        "base":messages_to_data(memory.base),
         "head":memory.head,
-        "commits":memory.commits,
-        "snapshots":memory.snapshots,
+        "commits":commits,
+        "snapshots":snapshots,
         "next_id":memory.next_id
     }
 
 def apply_data_to_memory(memory,data):#将data的数据加载到memory对象中 所以是load
-    memory.context   = data["context"]
-    memory.base      = data["base"]
+    memory.context   = messages_from_data(data["context"])
+    memory.base      = messages_from_data(data["base"])
     memory.head      = data["head"]
-    memory.snapshots = data["snapshots"]
+    memory.snapshots = {name: snapshot_from_data(name, snapshot) for name,snapshot in data["snapshots"].items()}
     memory.next_id   = data["next_id"]
-    memory.commits   ={int(k): v for k, v in data["commits"].items()} # 只有 commits 的键要从字符串转回整数
+    memory.commits   ={int(k): commit_from_data(v) for k, v in data["commits"].items()} # 只有 commits 的键要从字符串转回整数
 
 def validate_data_commits(data):
     required_commit_key=["id","parent","patch","created_at"]
@@ -161,3 +191,29 @@ def validate_data_commits(data):
             return False
 
     return True
+
+def get_storage_version(data):
+    return data.get("version", 0)
+
+def migrate_data(data):
+    version = data.get("version", 0)
+
+    if version == STORAGE_VERSION:
+        return data
+
+    if version == 0:
+        migrated = dict(data)
+        migrated["version"] = 1
+
+        snapshots = {}
+        for name, snapshot in data["snapshots"].items():
+            new_snapshot = dict(snapshot)
+            if "cached_context" not in new_snapshot and "messages" in new_snapshot:
+                new_snapshot["cached_context"] = new_snapshot.pop("messages")
+            snapshots[name] = new_snapshot
+
+        migrated["snapshots"] = snapshots
+        return migrated
+
+    print("unsupported storage version:", version)
+    return None

@@ -1,3 +1,5 @@
+from core.models import messages_from_data
+
 
 def lcs_table(old,new):
     m=len(old)
@@ -36,6 +38,8 @@ def get_lcs(old,new):
     return lcs
 
 def show_diff(old_context,new_context):
+        old_context=messages_from_data(old_context)
+        new_context=messages_from_data(new_context)
         lcs=get_lcs(old_context,new_context)
 
         i = j = k = 0
@@ -46,7 +50,7 @@ def show_diff(old_context,new_context):
             return
 
         while i<len(old_context) or j<len(new_context):
-            
+
             if k<len(lcs) and i<len(old_context) and j<len(new_context)\
                 and old_context[i] == lcs[k] and new_context[j] == lcs[k]:
                     i+=1
@@ -54,11 +58,11 @@ def show_diff(old_context,new_context):
                     k+=1
             elif i < len(old_context) and (k >= len(lcs) or old_context[i] != lcs[k]):
                 msg = old_context[i]
-                print("-", msg["role"] + ":", msg["content"])
-                i += 1         
+                print("-", msg.role + ":", msg.content)
+                i += 1
             else:
                 msg = new_context[j]
-                print("+", msg["role"] + ":", msg["content"])
+                print("+", msg.role + ":", msg.content)
                 j += 1
 
 

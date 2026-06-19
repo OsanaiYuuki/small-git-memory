@@ -1,3 +1,4 @@
+from core.models import messages_to_data
 from core.patch import make_patch, apply_patch, undo
 
 
@@ -5,10 +6,10 @@ def check_patch(title, old, new):
     patch = make_patch(old, new)
 
     rebuilt = apply_patch(old, patch)
-    assert rebuilt == new, "apply_patch failed"
+    assert messages_to_data(rebuilt) == new, "apply_patch failed"
 
     reverted = undo(new, patch)
-    assert reverted == old, "undo failed"
+    assert messages_to_data(reverted) == old, "undo failed"
 
     print(title, "yes")
 

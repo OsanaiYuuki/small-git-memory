@@ -2,6 +2,7 @@ from core.git_memory import GitMemory
 from core.storage import save_memory, load_memory
 
 memory=GitMemory()
+
 def help_info():
     print("commands:")
     print("  add <role> <content>     add a message")
@@ -17,12 +18,49 @@ def help_info():
     print("  status                   show current status")
     print("  log                      show snapshots")
     print("  history                  show commit tree nodes ")
+    print("  tree                     show commit tree")
     print("  save                     save data to file")
     print("  clear                    Only clear memory")
     print("  all_clear                clear all memory")
     print("  load                     load data from file")
     print("  diff                     compare HEAD and context")
     print("  exit                     quit")
+
+
+def print_tree(memory):
+    tree = memory.history_tree_data()
+    nodes = tree["nodes"]
+
+    def format_node(node_id):
+        node = nodes[node_id]
+        labels = []
+
+        if node["is_head"]:
+            labels.append("HEAD")
+        if node["snapshots"]:
+            labels.append("snapshot: " + ", ".join(node["snapshots"]))
+
+        label_text = ""
+        if labels:
+            label_text = " [" + " | ".join(labels) + "]"
+
+        return f"{node_id}{label_text} ({node['message_count']} messages)"
+
+    def walk(node_id, prefix="", is_last=True, is_root=False):
+        if is_root:
+            print(format_node(node_id))
+            child_prefix = ""
+        else:
+            connector = "`-- " if is_last else "|-- "
+            print(prefix + connector + format_node(node_id))
+            child_prefix = prefix + ("    " if is_last else "|   ")
+
+        children = nodes[node_id]["children"]
+        for index, child_id in enumerate(children):
+            walk(child_id, child_prefix, index == len(children) - 1)
+
+    for index, root_id in enumerate(tree["roots"]):
+        walk(root_id, "", index == len(tree["roots"]) - 1, is_root=True)
 
 
 def run_cli(memory):
@@ -61,6 +99,9 @@ def run_cli(memory):
 
         elif command == "history":
             memory.history()
+
+        elif command == "tree":
+            print_tree(memory)
 
         elif command == "validate":
             memory.validate_context()

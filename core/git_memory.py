@@ -1,11 +1,12 @@
 import copy
 from core.diff import show_diff
 from datetime import datetime
+from core.models import CommitNode, Message, Snapshot
 from core.patch import make_patch, apply_patch
 
-DEFAULT_CONTEXT=[ 
-            {"role":"user","content":"comeback"},
-            {"role":"assistant","content":"ok go"}
+DEFAULT_CONTEXT=[
+            Message("user", "comeback"),
+            Message("assistant", "ok go")
         ]
 
 class GitMemory:
@@ -22,7 +23,7 @@ class GitMemory:
 
     
     def add_message(self,role:str,content:str)->None:
-        message={"role":role,"content":content}
+        message=Message(role, content)
         self.context.append(message)
         self.commit()#每次添加自动保存
     
@@ -39,23 +40,24 @@ class GitMemory:
         
         removed_message=self.context.pop(real_index)
         message=removed_message
-        print("remove:",message["role"]+":",message["content"])
+        print("remove:",message.role+":",message.content)
 
         self.validate_context()
         self.commit()#每次删除自动存档  this is good 
 
     
-    def snapshot(self,name:str, note:str="")->None:
+    def snapshot(self,name:str, note:str="")->None:#这是用来创建快照的方法 小存档或者贴纸
         if name in self.snapshots:
             print("The name already exists!")
             return
         
-        self.snapshots[name]={
-            "messages": copy.deepcopy(self.context),
-            "created_at":datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "note":note,
-            "node_id":self.head
-        }
+        self.snapshots[name]=Snapshot(
+            name=name,
+            node_id=self.head,
+            created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            note=note,
+            cached_context=copy.deepcopy(self.context)
+        )
         print(f"snapshot created: {name} on node {self.head}")
 
         
@@ -96,7 +98,7 @@ class GitMemory:
             print("no name can rollback:",name)
             return
         
-        node_id=self.snapshots[name]["node_id"]
+        node_id=self.snapshots[name].node_id
         self.rollback(node_id)
 
 
@@ -113,13 +115,13 @@ class GitMemory:
 
         print("当前 context:")
         for index, message in enumerate(self.context,start=1):
-            print(" ",index,message["role"]+":",message["content"])
+            print(" ",index,message.role+":",message.content)
     
     def show_context(self):
         print("context:")
 
         for index, message in enumerate(self.context,start=1):
-            print(index,message["role"]+":",message["content"])
+            print(index,message.role+":",message.content)
 
 
 
@@ -127,16 +129,16 @@ class GitMemory:
         print("snapshots:")
         
         for name,snapshot in self.snapshots.items(): 
-            messages_count=len(snapshot["messages"])
-            now_time=snapshot["created_at"]
-            note=snapshot["note"]
+            messages_count=len(snapshot.cached_context) if snapshot.cached_context is not None else 0
+            now_time=snapshot.created_at
+            note=snapshot.note
             
             print(f"{name} ({now_time}  {messages_count}  messages)")
             print(f"   note:{note}")
             
            
             
-            if snapshot["node_id"] == self.head:
+            if snapshot.node_id == self.head:
                 print("now in this snapshots:",name)
 
     def history(self):#展示历史节点，snapshot
@@ -148,7 +150,7 @@ class GitMemory:
             
             names=[]#显示snapshot分组
             for name,snapshot in self.snapshots.items():
-                if snapshot["node_id"]==node_id:
+                if snapshot.node_id==node_id:
                     names.append(name)
             if names:
                 snapshot_text = ", ".join(names)
@@ -157,15 +159,17 @@ class GitMemory:
             if node_id == self.head:
                 marker="*"
     
-            commit_id=node["id"]
-            parent=node["parent"]
+            commit_id=node.id
+            parent=node.parent
             
             print(f"{marker} id={commit_id} parent={parent} snapshots={snapshot_text}")
 
 
     def diff(self):
         names,snapshot=self._find_nearest_snapshot()
-        old_context=snapshot["messages"]
+        old_context=snapshot.cached_context
+        if old_context is None:
+            old_context=self._rebuild(snapshot.node_id)
         new_context=self.context
 
         print("diff from nearest snapshot:", ", ".join(names))
@@ -181,8 +185,14 @@ class GitMemory:
             print("new snapshots not exists")
             return
         
-        old_context=self.snapshots[old_name]["messages"]
-        new_context=self.snapshots[new_name]["messages"]
+        old_snapshot=self.snapshots[old_name]
+        new_snapshot=self.snapshots[new_name]
+        old_context=old_snapshot.cached_context
+        if old_context is None:
+            old_context=self._rebuild(old_snapshot.node_id)
+        new_context=new_snapshot.cached_context
+        if new_context is None:
+            new_context=self._rebuild(new_snapshot.node_id)
 
         print("diff",old_name,"->",new_name)
         show_diff(old_context,new_context)   
@@ -199,13 +209,13 @@ class GitMemory:
 
     def has_user_message(self):
         for message in self.context:
-            if message.get("role") == "user":
+            if message.role == "user":
                 return True
         return False
 
     def has_assistant_message(self):
         for message in self.context:
-            if message.get("role") == "assistant":
+            if message.role == "assistant":
                 return True
         return False
     
@@ -222,11 +232,11 @@ class GitMemory:
             print("warning:context has no user message")
 
         for index,message in enumerate(self.context,start=1):
-            if "role" not in message:
-                print("warnging:message",index,"has no role")
-            
-            if "content" not in message:
-                print("warnging:message",index,"has no content")
+            if not isinstance(message.role, str):
+                print("warnging:message",index,"has invalid role")
+
+            if not isinstance(message.content, str):
+                print("warnging:message",index,"has invalid content")
 
         print("context validation finished")
 
@@ -237,12 +247,12 @@ class GitMemory:
         patch=make_patch(self.base,self.context)
 
         new_id=self.next_id
-        self.commits[new_id]={
-            "id": new_id,
-            "parent":self.head,
-            "patch":patch,
-            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
+        self.commits[new_id]=CommitNode(
+            id=new_id,
+            parent=self.head,
+            patch=patch,
+            created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        )
 
         self.next_id += 1
         self.head=new_id # HEAD 移到新节点
@@ -252,27 +262,28 @@ class GitMemory:
     def _create_root(self):#定义最初的根
         root_id=self.next_id #0
 
-        self.commits[root_id]={
-            "id":root_id,
-            "parent":None, #根没有父亲 :(
-            "patch":[],
-            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
+        self.commits[root_id]=CommitNode(
+            id=root_id,
+            parent=None, #根没有父亲 :(
+            patch=[],
+            created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        )
         self.next_id += 1 #id迭代
         self.head = root_id#HEAD站在根上
 
-        self.snapshots["__root__"]={
-            "messages":copy.deepcopy(DEFAULT_CONTEXT),
-            "created_at":datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "note":"System Root Node",
-            "node_id":root_id   #就像贴纸 贴在根节点0上 作为索引
-        }
+        self.snapshots["__root__"]=Snapshot(
+            name="__root__",
+            node_id=root_id,   #就像贴纸 贴在根节点0上 作为索引
+            created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            note="System Root Node",
+            cached_context=copy.deepcopy(DEFAULT_CONTEXT)
+        )
 
 
     def _find_snapshot_by_node(self,node_id):#辅助 如何找到snapshot id
         for snap in self.snapshots.values():
-            if node_id == snap["node_id"]:
-                return copy.deepcopy(snap["messages"])
+            if node_id == snap.node_id and snap.cached_context is not None:
+                return copy.deepcopy(snap.cached_context)
         return None
     
 
@@ -285,8 +296,8 @@ class GitMemory:
             if start_state is not None:
                 break #找到起点 snapshot
             node=self.commits[current] #没找到 把当前的patch收起来
-            patches.append(node["patch"])
-            current=node["parent"]
+            patches.append(node.patch)
+            current=node.parent
 
         patches.reverse()#反转
 
@@ -298,7 +309,7 @@ class GitMemory:
         
 
     def undo(self):#undo的颗粒度是每次对话 用户的输入 模型的输出
-        parent =self.commits[self.head]["parent"]  #当前节点的父亲
+        parent =self.commits[self.head].parent  #当前节点的父亲
         if parent is None:                         #代表当前节点是根节点
             print("It is already in its initial state and cannot be undone")
             return
@@ -314,7 +325,7 @@ class GitMemory:
             if snap is not None:
                 return count
             count +=1
-            current=self.commits[current]["parent"]
+            current=self.commits[current].parent
 
 
     def _find_nearest_snapshot(self): #从当前的self.head向上爬 直到遇见最近的snopshot 返回 #找最近书签的写法
@@ -325,17 +336,79 @@ class GitMemory:
             found_snapshot=None
 
             for name,snapshot in self.snapshots.items(): #遍历所有的snapshots
-                if current == snapshot["node_id"]:
+                if current == snapshot.node_id:
                     names.append(name)
                     found_snapshot=snapshot
            
             if names:    #如果列表不为空  == if len(names)>0
                 return names,found_snapshot
-            current = self.commits[current]["parent"] #拿到父节点 
+            current = self.commits[current].parent #拿到父节点
 
-        
-        
-        
+
+    def children_by_parent(self) -> dict[int | None, list[int]]:# 把 parent 指针反转成 children 列表
+        children = {}
+
+        for node_id, node in self.commits.items():
+            parent = node.parent
+
+            if parent not in children:
+                children[parent] = []
+
+            children[parent].append(node_id)
+
+        for child_ids in children.values():
+                child_ids.sort()     
+
+        return children
+    
+
+    def snapshots_by_node(self) -> dict[int, list[str]]:#把 snapshot name 反查到 node 上
+        result = {}
+
+        for name, snapshot in self.snapshots.items():
+            node_id = snapshot.node_id
+
+            if node_id not in result:
+                result[node_id] = []
+
+            result[node_id].append(name)
+
+        for names in result.values():
+            names.sort()
+        return result
+    
+    def get_context_at(self, node_id: int) -> list[Message]:#点击树节点时显示 messages,diff 两个节点  给 node id，恢复完整上下文
+        if node_id not in self.commits:
+            raise ValueError("node_id does not exist")
+        return copy.deepcopy(self._rebuild(node_id)) #返回 copy，避免外部改坏内部状态
+    
+
+    def history_tree_data(self) -> dict:# 组合成 UI/CLI 能直接使用的树数据
+        children = self.children_by_parent()
+        snapshots = self.snapshots_by_node()
+
+        nodes = {}
+
+        for node_id, node in self.commits.items():
+            context = self.get_context_at(node_id)
+
+            nodes[node_id] = {
+                "id": node.id,
+                "parent": node.parent,
+                "children": children.get(node_id, []),
+                "snapshots": snapshots.get(node_id, []),
+                "is_head": node_id == self.head,
+                "message_count": len(context),
+                "created_at": node.created_at,
+            }
+
+        return {
+            "head": self.head,
+            "roots": children.get(None, []),
+            "nodes": nodes,
+        }
+                
+            
         
         
 
