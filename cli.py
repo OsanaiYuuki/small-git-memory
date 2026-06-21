@@ -10,7 +10,7 @@ def help_info():
     print("  add <role> <content>     add a message")
     print("  remove <index>           remove message by index")
     print("  validate                 validate current context")
-    print("  snapshot <name>          save current context,save a snapshot")
+    print("  snapshot <name> [note]   save current context,save a snapshot")
     print("  delete_snapshot <name>   delete a snapshot")
     print("  auto                     auto create a snapshot")
     print("  rollback <node_id>       rollback to a commit node")
@@ -158,11 +158,12 @@ def run_cli(memory):
 
         elif parts[0] == "snapshot":
             if len(parts) < 2:
-                print("usage:snapshot<name>")
+                print("usage:snapshot<name>[note]")
                 continue
 
             name = parts[1]
-            memory.snapshot(name)
+            note = parts[2] if len(parts) == 3 else ""
+            memory.snapshot(name, note)
 
         elif parts[0] == "delete_snapshot":
             if len(parts) < 2:

@@ -97,3 +97,15 @@ def test_diff_nodes_rejects_missing_node():
 
     with pytest.raises(ValueError):
         memory.diff_nodes(0, 999)
+
+
+def test_log_shows_snapshot_note(capsys):
+    memory = GitMemory()
+
+    memory.snapshot("mark", "a tiny note")
+    memory.log()
+
+    output = capsys.readouterr().out
+
+    assert "mark" in output
+    assert "note:a tiny note" in output
