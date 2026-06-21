@@ -14,11 +14,11 @@ def assert_patch_roundtrip(old, new):
 
 def test_make_patch_add_message():
     old = [
-        {"role": "user", "content": "你好"},
+        {"role": "user", "content": "hello"},
     ]
     new = [
-        {"role": "user", "content": "你好"},
-        {"role": "user", "content": "帮我写代码"},
+        {"role": "user", "content": "hello"},
+        {"role": "user", "content": "help me write code"},
     ]
 
     assert_patch_roundtrip(old, new)
@@ -26,11 +26,11 @@ def test_make_patch_add_message():
 
 def test_make_patch_delete_message():
     old = [
-        {"role": "user", "content": "你好"},
-        {"role": "user", "content": "再见"},
+        {"role": "user", "content": "hello"},
+        {"role": "user", "content": "bye"},
     ]
     new = [
-        {"role": "user", "content": "你好"},
+        {"role": "user", "content": "hello"},
     ]
 
     assert_patch_roundtrip(old, new)
@@ -38,11 +38,11 @@ def test_make_patch_delete_message():
 
 def test_make_patch_change_message_as_delete_add():
     old = [
-        {"role": "user", "content": "你好"},
+        {"role": "user", "content": "hello"},
         {"role": "assistant", "content": "A"},
     ]
     new = [
-        {"role": "user", "content": "你好"},
+        {"role": "user", "content": "hello"},
         {"role": "assistant", "content": "B"},
     ]
 
@@ -51,10 +51,10 @@ def test_make_patch_change_message_as_delete_add():
 
 def test_make_patch_keep_all_messages():
     old = [
-        {"role": "user", "content": "你好"},
+        {"role": "user", "content": "hello"},
     ]
     new = [
-        {"role": "user", "content": "你好"},
+        {"role": "user", "content": "hello"},
     ]
 
     assert_patch_roundtrip(old, new)

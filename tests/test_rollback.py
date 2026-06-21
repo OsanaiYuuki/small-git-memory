@@ -7,13 +7,13 @@ def build_memory_with_expected_contexts():
     memory = GitMemory()
     expected = {memory.head: copy.deepcopy(memory.context)}
 
-    memory.add_message("user", "第一句")
+    memory.add_message("user", "first message")
     expected[memory.head] = copy.deepcopy(memory.context)
 
-    memory.add_message("assistant", "第二句")
+    memory.add_message("assistant", "second message")
     expected[memory.head] = copy.deepcopy(memory.context)
 
-    memory.add_message("user", "第三句")
+    memory.add_message("user", "third message")
     expected[memory.head] = copy.deepcopy(memory.context)
 
     return memory, expected

@@ -17,7 +17,7 @@ def test_add_message_auto_commits_and_advances_base():
     memory = GitMemory()
     before_base = copy.deepcopy(memory.base)
 
-    memory.add_message("user", "帮我写代码")
+    memory.add_message("user", "help me write code")
 
     assert len(memory.commits) == 2
     assert memory.base == memory.context
@@ -27,7 +27,7 @@ def test_add_message_auto_commits_and_advances_base():
 
 def test_remove_message_auto_commits_and_advances_base():
     memory = GitMemory()
-    memory.add_message("user", "帮我写代码")
+    memory.add_message("user", "help me write code")
     before_base = copy.deepcopy(memory.base)
 
     memory.remove_message(1)
@@ -40,7 +40,7 @@ def test_remove_message_auto_commits_and_advances_base():
 
 def test_commit_after_no_new_change_does_not_create_extra_node():
     memory = GitMemory()
-    memory.add_message("user", "帮我写代码")
+    memory.add_message("user", "help me write code")
     memory.remove_message(1)
 
     memory.commit()

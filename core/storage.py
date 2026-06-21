@@ -1,54 +1,65 @@
-import json 
+import json
 import os
+
 from config import DATA_FILE
-from core.models import commit_from_data, commit_to_data, messages_from_data, messages_to_data, snapshot_from_data, snapshot_to_data
+from core.models import (
+    commit_from_data,
+    commit_to_data,
+    messages_from_data,
+    messages_to_data,
+    snapshot_from_data,
+    snapshot_to_data,
+)
+
 
 STORAGE_VERSION = 1
 
+
 def save_memory(memory):
-    data=memory_to_data(memory)
+    data = memory_to_data(memory)
 
-    with open(DATA_FILE,'w',encoding="utf-8")as f:
-        json.dump(data,f,ensure_ascii=False,indent=2)
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
-    print("saved to",DATA_FILE)
+    print("saved to", DATA_FILE)
+
 
 def load_memory(memory):
-    if not os.path.exists(DATA_FILE):#Processing file does not exist
-        print("data file not exist:",DATA_FILE)
+    if not os.path.exists(DATA_FILE):
+        print("data file not exist:", DATA_FILE)
         return
-    
+
     try:
-        with open(DATA_FILE,"r",encoding="utf-8")as f:
-            data=json.load(f)
-    except json.JSONDecodeError:#Processing non-valid JSON
-        print("data file is not valid json:",DATA_FILE)
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except json.JSONDecodeError:
+        print("data file is not valid json:", DATA_FILE)
         return
-    
+
     data = migrate_data(data)
-    
+
     if data is None:
         return
 
     if not validate_data(data):
-        return 
-    
-    apply_data_to_memory(memory,data)
+        return
 
-    print("loaded from", DATA_FILE)     
+    apply_data_to_memory(memory, data)
+
+    print("loaded from", DATA_FILE)
 
 
 def validate_messages(messages):
     if not isinstance(messages, list):
-        print("message is not a list:",messages)
+        print("message is not a list:", messages)
         return False
-    
+
     for message in messages:
-        if not isinstance(message,dict):
-            print("message is not a dict:",message)
+        if not isinstance(message, dict):
+            print("message is not a dict:", message)
             return False
         if "role" not in message or "content" not in message:
-            print("message missing role or content",message)
+            print("message missing role or content", message)
             return False
     return True
 
@@ -56,31 +67,30 @@ def validate_messages(messages):
 def validate_data(data):
     version = get_storage_version(data)
 
-    if version!=STORAGE_VERSION:
+    if version != STORAGE_VERSION:
         print("unsupported storage version:", version)
         return False
 
-    required_keys=["version","context","base","head","commits","snapshots","next_id"]
-        #The key required for a valid JSON
+    required_keys = ["version", "context", "base", "head", "commits", "snapshots", "next_id"]
 
     for key in required_keys:
         if key not in data:
-            print("data file missing key:",key)
-            return  False
+            print("data file missing key:", key)
+            return False
 
-    if not isinstance(data["snapshots"],dict):
+    if not isinstance(data["snapshots"], dict):
         print("snapshots must be a dict")
         return False
 
-    if not isinstance(data["commits"],dict):
+    if not isinstance(data["commits"], dict):
         print("commits must be a dict")
         return False
-    
-    if not isinstance(data["head"],int):
-        print("head must be an int (node id)")
-        return  False
 
-    if not isinstance(data["next_id"],int):
+    if not isinstance(data["head"], int):
+        print("head must be an int (node id)")
+        return False
+
+    if not isinstance(data["next_id"], int):
         print("next_id must be an int")
         return False
 
@@ -92,20 +102,17 @@ def validate_data(data):
 
     if not validate_messages(data["base"]):
         return False
-    
-    
 
-
-    for name,snapshot in data["snapshots"].items():
-        if not isinstance(snapshot,dict):
+    for name, snapshot in data["snapshots"].items():
+        if not isinstance(snapshot, dict):
             print("snapshot should be a dict")
             return False
 
-        required_snapshots_keys=["created_at","note","node_id"] #对应snapshots结构
+        required_snapshots_keys = ["created_at", "note", "node_id"]
 
         for key in required_snapshots_keys:
             if key not in snapshot:
-                print("snapshots file missing key:",key)
+                print("snapshots file missing key:", key)
                 return False
         if "cached_context" not in snapshot and "messages" not in snapshot:
             print("snapshot missing cached_context:", name)
@@ -117,56 +124,60 @@ def validate_data(data):
         if str(snapshot["node_id"]) not in data["commits"]:
             print("snapshot points to missing node:", name)
             return False
-            
 
-        cached_context=snapshot.get("cached_context", snapshot.get("messages"))
+        cached_context = snapshot.get("cached_context", snapshot.get("messages"))
         if cached_context is not None and not validate_messages(cached_context):
-            print("snapshot cached_context is invalid",snapshot)
+            print("snapshot cached_context is invalid", snapshot)
             return False
 
     return True
 
-def memory_to_data(memory):#把memory的属性抽象成一个dict返回 让data接收
-    commits={}
-    for commit_id,node in memory.commits.items():
+
+def memory_to_data(memory):
+    commits = {}
+    for commit_id, node in memory.commits.items():
         commits[str(commit_id)] = commit_to_data(node)
 
-    snapshots={}
-    for name,snapshot in memory.snapshots.items():
-        snapshots[name]=snapshot_to_data(snapshot)
+    snapshots = {}
+    for name, snapshot in memory.snapshots.items():
+        snapshots[name] = snapshot_to_data(snapshot)
 
-    return{
-        "version":STORAGE_VERSION,
-        "context":messages_to_data(memory.context),
-        "base":messages_to_data(memory.base),
-        "head":memory.head,
-        "commits":commits,
-        "snapshots":snapshots,
-        "next_id":memory.next_id
+    return {
+        "version": STORAGE_VERSION,
+        "context": messages_to_data(memory.context),
+        "base": messages_to_data(memory.base),
+        "head": memory.head,
+        "commits": commits,
+        "snapshots": snapshots,
+        "next_id": memory.next_id,
     }
 
-def apply_data_to_memory(memory,data):#将data的数据加载到memory对象中 所以是load
-    memory.context   = messages_from_data(data["context"])
-    memory.base      = messages_from_data(data["base"])
-    memory.head      = data["head"]
-    memory.snapshots = {name: snapshot_from_data(name, snapshot) for name,snapshot in data["snapshots"].items()}
-    memory.next_id   = data["next_id"]
-    memory.commits   ={int(k): commit_from_data(v) for k, v in data["commits"].items()} # 只有 commits 的键要从字符串转回整数
+
+def apply_data_to_memory(memory, data):
+    memory.context = messages_from_data(data["context"])
+    memory.base = messages_from_data(data["base"])
+    memory.head = data["head"]
+    memory.snapshots = {
+        name: snapshot_from_data(name, snapshot) for name, snapshot in data["snapshots"].items()
+    }
+    memory.next_id = data["next_id"]
+    memory.commits = {int(k): commit_from_data(v) for k, v in data["commits"].items()}
+
 
 def validate_data_commits(data):
-    required_commit_key=["id","parent","patch","created_at"]
+    required_commit_key = ["id", "parent", "patch", "created_at"]
 
-    if str(data["head"])not in data["commits"]:
+    if str(data["head"]) not in data["commits"]:
         print("head node not exist")
         return False
-    for commit_id,node in data["commits"].items():
-        if not isinstance(node,dict):
-            print("commit node must be a dict:",commit_id)
+    for commit_id, node in data["commits"].items():
+        if not isinstance(node, dict):
+            print("commit node must be a dict:", commit_id)
             return False
-        
+
         for key in required_commit_key:
             if key not in node:
-                print("commit missing key:",key)
+                print("commit missing key:", key)
                 return False
         if not isinstance(node["id"], int):
             print("commit id must be an int:", commit_id)
@@ -192,8 +203,10 @@ def validate_data_commits(data):
 
     return True
 
+
 def get_storage_version(data):
     return data.get("version", 0)
+
 
 def migrate_data(data):
     version = data.get("version", 0)
