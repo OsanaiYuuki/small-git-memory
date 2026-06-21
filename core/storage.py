@@ -1,5 +1,6 @@
 import json
 import os
+import tempfile
 
 from config import DATA_FILE
 from core.models import (
@@ -17,11 +18,35 @@ STORAGE_VERSION = 1
 
 def save_memory(memory):
     data = memory_to_data(memory)
-
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    save_data_atomic(DATA_FILE, data)
 
     print("saved to", DATA_FILE)
+
+
+def save_data_atomic(path, data):
+    directory = os.path.dirname(path) or "."
+    basename = os.path.basename(path)
+    temp_path = None
+
+    try:
+        fd, temp_path = tempfile.mkstemp(
+            prefix=f".{basename}.",
+            suffix=".tmp",
+            dir=directory,
+            text=True,
+        )
+
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.write("\n")
+            f.flush()
+            os.fsync(f.fileno())
+
+        os.replace(temp_path, path)
+        temp_path = None
+    finally:
+        if temp_path is not None and os.path.exists(temp_path):
+            os.remove(temp_path)
 
 
 def load_memory(memory):
