@@ -67,6 +67,60 @@ def print_tree(memory):
         walk(root_id, "", index == len(tree["roots"]) - 1, is_root=True)
 
 
+def print_context(memory):
+    print("context:")
+
+    for message in memory.context_data():
+        print(message["index"], message["role"] + ":", message["content"])
+
+
+def print_status(memory):
+    data = memory.status_data()
+
+    print("HEAD node:", data["head"])
+    print("commit nodes:", data["commit_count"])
+    print("snapshots:", data["snapshot_count"])
+
+    if data["commits_since_snapshot"] == 0:
+        print("current HEAD is on a snapshot")
+    else:
+        print(f"{data['commits_since_snapshot']} commits since nearest snapshot; consider creating a snapshot")
+
+    print("current context:")
+    for message in data["context"]:
+        print(" ", message["index"], message["role"] + ":", message["content"])
+
+
+def print_snapshot_log(memory):
+    print("snapshots:")
+
+    for snapshot in memory.snapshot_log_data():
+        print(f"{snapshot['name']} ({snapshot['created_at']}  {snapshot['message_count']}  messages)")
+        print(f"   note:{snapshot['note']}")
+
+        if snapshot["is_head"]:
+            print("now in this snapshots:", snapshot["name"])
+
+
+def print_history(memory):
+    print("commits:")
+
+    for node in memory.history():
+        marker = "*" if node["is_head"] else " "
+        snapshot_text = ", ".join(node["snapshots"]) if node["snapshots"] else "-"
+        print(f"{marker} id={node['id']} parent={node['parent']} snapshots={snapshot_text}")
+
+
+def print_diff(changes):
+    if not changes:
+        print("No change")
+        return
+
+    for change in changes:
+        prefix = "+" if change["op"] == "add" else "-"
+        print(prefix, change["role"] + ":", change["content"])
+
+
 def run_cli(memory):
     while True:
         try:
@@ -91,16 +145,16 @@ def run_cli(memory):
             break
 
         elif command == "show":
-            memory.show_context()
+            print_context(memory)
 
         elif command == "status":
-            memory.status()
+            print_status(memory)
 
         elif command == "log":
-            memory.log()
+            print_snapshot_log(memory)
 
         elif command == "history":
-            memory.history()
+            print_history(memory)
 
         elif command == "tree":
             print_tree(memory)
@@ -110,7 +164,9 @@ def run_cli(memory):
 
         elif parts[0] == "diff":
             if len(parts) == 1:
-                memory.diff()
+                diff = memory.diff()
+                print("diff from nearest snapshot:", ", ".join(diff["from"]))
+                print_diff(diff["changes"])
             else:
                 print("usage:diff")
 
@@ -126,11 +182,23 @@ def run_cli(memory):
                 print("node id must be a number")
                 continue
 
-            memory.diff_nodes(old_id, new_id)
+            try:
+                diff = memory.diff_nodes(old_id, new_id)
+            except ValueError as error:
+                print(error)
+                continue
+            print("diff", diff["from"], "->", diff["to"])
+            print_diff(diff["changes"])
 
         elif parts[0] == "diff_snapshot":
             if len(parts) == 3:
-                memory.diff_snapshots(parts[1], parts[2])
+                try:
+                    diff = memory.diff_snapshots(parts[1], parts[2])
+                except ValueError as error:
+                    print(error)
+                    continue
+                print("diff", diff["from"], "->", diff["to"])
+                print_diff(diff["changes"])
             else:
                 print("usage: diff_snapshot <old_snapshot> <new_snapshot>")
 
@@ -163,7 +231,12 @@ def run_cli(memory):
 
             name = parts[1]
             note = parts[2] if len(parts) == 3 else ""
-            memory.snapshot(name, note)
+            try:
+                snapshot = memory.snapshot(name, note)
+            except ValueError as error:
+                print(error)
+                continue
+            print(f"snapshot created: {snapshot.name} on node {snapshot.node_id}")
 
         elif parts[0] == "delete_snapshot":
             if len(parts) < 2:
@@ -171,7 +244,12 @@ def run_cli(memory):
                 continue
 
             name = parts[1]
-            memory.delete_snapshot(name)
+            try:
+                memory.delete_snapshot(name)
+            except ValueError as error:
+                print(error)
+                continue
+            print("snapshot deleted:", name)
 
         elif parts[0] == "rollback":
             if len(parts) < 2:
@@ -184,7 +262,10 @@ def run_cli(memory):
                 print("node_id must be a number")
                 continue
 
-            memory.rollback(node_id)
+            try:
+                memory.rollback(node_id)
+            except ValueError as error:
+                print(error)
 
         elif parts[0] == "rollback_snapshot":
             if len(parts) < 2:
@@ -192,16 +273,25 @@ def run_cli(memory):
                 continue
 
             name = parts[1]
-            memory.rollback_snapshot(name)
+            try:
+                memory.rollback_snapshot(name)
+            except ValueError as error:
+                print(error)
 
         elif command == "undo":
-            memory.undo()
+            try:
+                node_id = memory.undo()
+            except ValueError as error:
+                print(error)
+                continue
+            print("undone to node", node_id)
 
         elif command == "save":
             save_memory(memory)
 
         elif command == "auto":
-            memory.auto_snapshot()
+            snapshot = memory.auto_snapshot()
+            print(f"snapshot created: {snapshot.name} on node {snapshot.node_id}")
 
         elif command == "clear":
             memory.clear()

@@ -19,9 +19,11 @@ def test_snapshots_by_node_groups_names():
     m.add_message("user", "a")
     node1 = m.head
 
-    m.snapshot("point1-1")
+    snapshot = m.snapshot("point1-1")
     m.snapshot("point1-2")
 
+    assert snapshot.name == "point1-1"
+    assert snapshot.node_id == node1
     assert m.snapshots_by_node()[node1] == ["point1-1", "point1-2"]
 
 
@@ -76,7 +78,7 @@ def test_history_tree_data_marks_head_and_snapshots():
     assert nodes[branch_node]["message_count"] == 4
 
 
-def test_diff_nodes_compares_two_node_contexts(capsys):
+def test_diff_nodes_compares_two_node_contexts():
     memory = GitMemory()
 
     memory.add_message("user", "a")
@@ -85,11 +87,13 @@ def test_diff_nodes_compares_two_node_contexts(capsys):
     memory.add_message("assistant", "b")
     second_node = memory.head
 
-    memory.diff_nodes(first_node, second_node)
+    diff = memory.diff_nodes(first_node, second_node)
 
-    output = capsys.readouterr().out
-
-    assert "+ assistant: b" in output
+    assert diff["from"] == first_node
+    assert diff["to"] == second_node
+    assert diff["changes"] == [
+        {"op": "add", "role": "assistant", "content": "b"},
+    ]
 
 
 def test_diff_nodes_rejects_missing_node():
@@ -99,13 +103,93 @@ def test_diff_nodes_rejects_missing_node():
         memory.diff_nodes(0, 999)
 
 
-def test_log_shows_snapshot_note(capsys):
+def test_snapshot_log_data_includes_note():
     memory = GitMemory()
 
     memory.snapshot("mark", "a tiny note")
-    memory.log()
 
-    output = capsys.readouterr().out
+    snapshots = memory.snapshot_log_data()
 
-    assert "mark" in output
-    assert "note:a tiny note" in output
+    assert snapshots[-1]["name"] == "mark"
+    assert snapshots[-1]["note"] == "a tiny note"
+    assert snapshots[-1]["is_head"] is True
+
+
+def test_status_data_returns_summary_and_context():
+    memory = GitMemory()
+
+    memory.add_message("user", "a")
+
+    status = memory.status_data()
+
+    assert status["head"] == memory.head
+    assert status["commit_count"] == len(memory.commits)
+    assert status["snapshot_count"] == len(memory.snapshots)
+    assert status["commits_since_snapshot"] == 1
+    assert status["context"][-1] == {
+        "index": 3,
+        "role": "user",
+        "content": "a",
+    }
+
+
+def test_context_data_returns_message_dicts():
+    memory = GitMemory()
+
+    assert memory.context_data() == [
+        {"index": 1, "role": "user", "content": "comeback"},
+        {"index": 2, "role": "assistant", "content": "ok go"},
+    ]
+
+
+def test_snapshot_rejects_duplicate_name():
+    memory = GitMemory()
+    memory.snapshot("mark")
+
+    with pytest.raises(ValueError, match="snapshot already exists"):
+        memory.snapshot("mark")
+
+
+def test_delete_snapshot_rejects_root_and_missing_names():
+    memory = GitMemory()
+
+    with pytest.raises(ValueError, match="root snapshot can not be deleted"):
+        memory.delete_snapshot("__root__")
+
+    with pytest.raises(ValueError, match="snapshot not exist"):
+        memory.delete_snapshot("missing")
+
+
+def test_delete_snapshot_removes_existing_snapshot():
+    memory = GitMemory()
+    memory.snapshot("mark")
+
+    deleted_name = memory.delete_snapshot("mark")
+
+    assert deleted_name == "mark"
+    assert "mark" not in memory.snapshots
+
+
+def test_auto_snapshot_returns_created_snapshot():
+    memory = GitMemory()
+
+    snapshot = memory.auto_snapshot()
+
+    assert snapshot.name == "checkpoint_1"
+    assert snapshot.node_id == memory.head
+
+
+def test_query_methods_return_data_without_printing(capsys):
+    memory = GitMemory()
+    memory.snapshot("mark")
+    memory.add_message("user", "a")
+
+    assert memory.show_context() == memory.context_data()
+    assert memory.status() == memory.status_data()
+    assert memory.log() == memory.snapshot_log_data()
+    assert memory.history()[-1]["is_head"] is True
+    assert memory.diff()["changes"] == [
+        {"op": "add", "role": "user", "content": "a"},
+    ]
+
+    assert capsys.readouterr().out == ""

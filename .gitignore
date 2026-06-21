@@ -1,6 +1,8 @@
 __pycache__/
 *.pyc
 .venv/
+.vscode/
 .env
 gitmemory.json
 myoption.txt
+providers/

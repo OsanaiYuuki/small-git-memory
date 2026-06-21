@@ -1,7 +1,7 @@
 import copy
 from datetime import datetime
 
-from core.diff import show_diff
+from core.diff import diff_data
 from core.models import CommitNode, Message, Snapshot
 from core.patch import apply_patch, make_patch
 
@@ -44,29 +44,27 @@ class GitMemory:
         self.validate_context()
         self.commit()
 
-    def snapshot(self, name: str, note: str = "") -> None:
+    def snapshot(self, name: str, note: str = "") -> Snapshot:
         if name in self.snapshots:
-            print("The name already exists!")
-            return
+            raise ValueError("snapshot already exists")
 
-        self.snapshots[name] = Snapshot(
+        snapshot = Snapshot(
             name=name,
             node_id=self.head,
             created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             note=note,
             cached_context=copy.deepcopy(self.context),
         )
-        print(f"snapshot created: {name} on node {self.head}")
+        self.snapshots[name] = snapshot
+        return snapshot
 
-    def delete_snapshot(self, name):
+    def delete_snapshot(self, name) -> str:
         if name == "__root__":
-            print("root snapshot can not be deleted")
-            return
+            raise ValueError("root snapshot can not be deleted")
         if name not in self.snapshots:
-            print("snapshot not exist:", name)
-            return
+            raise ValueError("snapshot not exist")
         del self.snapshots[name]
-        print("snapshot deleted:", name)
+        return name
 
     def auto_snapshot(self):
         index = 1
@@ -76,80 +74,90 @@ class GitMemory:
             if name not in self.snapshots:
                 break
             index += 1
-        self.snapshot(name)
+        return self.snapshot(name)
 
-    def rollback(self, node_id: int) -> None:
+    def rollback(self, node_id: int) -> int:
         if node_id not in self.commits:
-            print("id is not exist", node_id)
-            return
+            raise ValueError("node id does not exist")
 
         self.head = node_id
         self.context = self._rebuild(node_id)
         self.base = copy.deepcopy(self.context)
+        return self.head
 
-    def rollback_snapshot(self, name: str):
+    def rollback_snapshot(self, name: str) -> int:
         if name not in self.snapshots:
-            print("no name can rollback:", name)
-            return
+            raise ValueError("snapshot not exist")
 
         node_id = self.snapshots[name].node_id
-        self.rollback(node_id)
+        return self.rollback(node_id)
 
     def status(self):
-        print("HEAD node:", self.head)
-        print("commit nodes:", len(self.commits))
-        print("snapshots:", len(self.snapshots))
+        return self.status_data()
 
-        drift = self.commits_since_snapshots()
-        if drift == 0:
-            print("current HEAD is on a snapshot")
-        else:
-            print(f"{drift} commits since nearest snapshot; consider creating a snapshot")
-
-        print("current context:")
-        for index, message in enumerate(self.context, start=1):
-            print(" ", index, message.role + ":", message.content)
+    def status_data(self):
+        return {
+            "head": self.head,
+            "commit_count": len(self.commits),
+            "snapshot_count": len(self.snapshots),
+            "commits_since_snapshot": self.commits_since_snapshots(),
+            "context": self.context_data(),
+        }
 
     def show_context(self):
-        print("context:")
+        return self.context_data()
 
-        for index, message in enumerate(self.context, start=1):
-            print(index, message.role + ":", message.content)
+    def context_data(self):
+        return [
+            {
+                "index": index,
+                "role": message.role,
+                "content": message.content,
+            }
+            for index, message in enumerate(self.context, start=1)
+        ]
 
     def log(self):
-        print("snapshots:")
+        return self.snapshot_log_data()
+
+    def snapshot_log_data(self):
+        result = []
 
         for name, snapshot in self.snapshots.items():
             messages_count = len(snapshot.cached_context) if snapshot.cached_context is not None else 0
-            now_time = snapshot.created_at
-            note = snapshot.note
 
-            print(f"{name} ({now_time}  {messages_count}  messages)")
-            print(f"   note:{note}")
+            result.append(
+                {
+                    "name": name,
+                    "node_id": snapshot.node_id,
+                    "created_at": snapshot.created_at,
+                    "note": snapshot.note,
+                    "message_count": messages_count,
+                    "is_head": snapshot.node_id == self.head,
+                }
+            )
 
-            if snapshot.node_id == self.head:
-                print("now in this snapshots:", name)
+        return result
 
     def history(self):
-        print("commits:")
+        nodes = []
 
         for node_id, node in self.commits.items():
-            marker = " "
             names = []
             for name, snapshot in self.snapshots.items():
                 if snapshot.node_id == node_id:
                     names.append(name)
-            if names:
-                snapshot_text = ", ".join(names)
-            else:
-                snapshot_text = "-"
-            if node_id == self.head:
-                marker = "*"
 
-            commit_id = node.id
-            parent = node.parent
+            nodes.append(
+                {
+                    "id": node.id,
+                    "parent": node.parent,
+                    "snapshots": names,
+                    "is_head": node_id == self.head,
+                }
+            )
 
-            print(f"{marker} id={commit_id} parent={parent} snapshots={snapshot_text}")
+        return nodes
 
     def diff(self):
         names, snapshot = self._find_nearest_snapshot()
@@ -158,17 +166,16 @@ class GitMemory:
             old_context = self._rebuild(snapshot.node_id)
         new_context = self.context
 
-        print("diff from nearest snapshot:", ", ".join(names))
-
-        show_diff(old_context, new_context)
+        return {
+            "from": names,
+            "changes": diff_data(old_context, new_context),
+        }
 
     def diff_snapshots(self, old_name, new_name):
         if old_name not in self.snapshots:
-            print("old snapshots not exist")
-            return
+            raise ValueError("old snapshot not exist")
         if new_name not in self.snapshots:
-            print("new snapshots not exists")
-            return
+            raise ValueError("new snapshot not exist")
 
         old_snapshot = self.snapshots[old_name]
         new_snapshot = self.snapshots[new_name]
@@ -179,8 +186,11 @@ class GitMemory:
         if new_context is None:
             new_context = self._rebuild(new_snapshot.node_id)
 
-        print("diff", old_name, "->", new_name)
-        show_diff(old_context, new_context)
+        return {
+            "from": old_name,
+            "to": new_name,
+            "changes": diff_data(old_context, new_context),
+        }
 
     def clear(self):
         self.snapshots = {}
@@ -290,10 +300,8 @@ class GitMemory:
     def undo(self):
         parent = self.commits[self.head].parent
         if parent is None:
-            print("It is already in its initial state and cannot be undone")
-            return
-        self.rollback(parent)
-        print("undone to node", parent)
+            raise ValueError("already at root node")
+        return self.rollback(parent)
 
     def commits_since_snapshots(self):
         current = self.head
@@ -385,4 +393,8 @@ class GitMemory:
     def diff_nodes(self, old_id: int, new_id: int):
         old_context = self.get_context_at(old_id)
         new_context = self.get_context_at(new_id)
-        show_diff(old_context, new_context)
+        return {
+            "from": old_id,
+            "to": new_id,
+            "changes": diff_data(old_context, new_context),
+        }

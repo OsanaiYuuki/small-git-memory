@@ -37,17 +37,13 @@ def get_lcs(old,new):
     lcs.reverse()
     return lcs
 
-def show_diff(old_context,new_context):
+def diff_data(old_context, new_context):
         old_context=messages_from_data(old_context)
         new_context=messages_from_data(new_context)
         lcs=get_lcs(old_context,new_context)
 
         i = j = k = 0
-
-
-        if old_context == new_context:
-            print("No change")
-            return
+        result = []
 
         while i<len(old_context) or j<len(new_context):
 
@@ -58,12 +54,26 @@ def show_diff(old_context,new_context):
                     k+=1
             elif i < len(old_context) and (k >= len(lcs) or old_context[i] != lcs[k]):
                 msg = old_context[i]
-                print("-", msg.role + ":", msg.content)
+                result.append({"op": "delete", "role": msg.role, "content": msg.content})
                 i += 1
             else:
                 msg = new_context[j]
-                print("+", msg.role + ":", msg.content)
+                result.append({"op": "add", "role": msg.role, "content": msg.content})
                 j += 1
+
+        return result
+
+
+def show_diff(old_context,new_context):
+        changes = diff_data(old_context, new_context)
+
+        if not changes:
+            print("No change")
+            return
+
+        for change in changes:
+            prefix = "+" if change["op"] == "add" else "-"
+            print(prefix, change["role"] + ":", change["content"])
 
 
 
