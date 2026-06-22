@@ -27,22 +27,18 @@ class GitMemory:
         self.context.append(message)
         self.commit()
 
-    def remove_message(self, index: int) -> None:
+    def remove_message(self, index: int) -> Message:
         if len(self.context) == 0:
-            print("No messages can be deleted")
-            return
+            raise ValueError("no messages can be deleted")
 
         real_index = index - 1
 
         if real_index < 0 or real_index >= len(self.context):
-            print("message index out of range", index)
-            return
+            raise ValueError("message index out of range")
 
         removed_message = self.context.pop(real_index)
-        print("remove:", removed_message.role + ":", removed_message.content)
-
-        self.validate_context()
         self.commit()
+        return removed_message
 
     def snapshot(self, name: str, note: str = "") -> Snapshot:
         if name in self.snapshots:
@@ -199,7 +195,7 @@ class GitMemory:
         self.base = copy.deepcopy(DEFAULT_CONTEXT)
         self.context = copy.deepcopy(DEFAULT_CONTEXT)
         self._create_root()
-        print("memory cleared")
+        return self.status_data()
 
     def has_user_message(self):
         for message in self.context:
@@ -214,24 +210,34 @@ class GitMemory:
         return False
 
     def validate_context(self):
+        return self.validate_context_data()
+
+    def validate_context_data(self):
+        errors = []
+        warnings = []
+
         if len(self.context) == 0:
-            print("context is empty")
-            return
+            errors.append("context is empty")
 
         if not self.has_assistant_message():
-            print("warning:context has no assistant message")
+            warnings.append("context has no assistant message")
 
         elif not self.has_user_message():
-            print("warning:context has no user message")
+            warnings.append("context has no user message")
 
         for index, message in enumerate(self.context, start=1):
             if not isinstance(message.role, str):
-                print("warnging:message", index, "has invalid role")
+                errors.append(f"message {index} has invalid role")
 
             if not isinstance(message.content, str):
-                print("warnging:message", index, "has invalid content")
+                errors.append(f"message {index} has invalid content")
 
-        print("context validation finished")
+        return {
+            "is_valid": len(errors) == 0,
+            "errors": errors,
+            "warnings": warnings,
+            "message_count": len(self.context),
+        }
 
     def commit(self):
         if self.base == self.context:

@@ -193,3 +193,39 @@ def test_query_methods_return_data_without_printing(capsys):
     ]
 
     assert capsys.readouterr().out == ""
+
+
+def test_validate_context_data_returns_structured_result():
+    memory = GitMemory()
+
+    result = memory.validate_context_data()
+
+    assert result == {
+        "is_valid": True,
+        "errors": [],
+        "warnings": [],
+        "message_count": 2,
+    }
+
+
+def test_validate_context_data_reports_missing_assistant():
+    memory = GitMemory()
+    memory.remove_message(2)
+
+    result = memory.validate_context_data()
+
+    assert result["is_valid"] is True
+    assert result["errors"] == []
+    assert result["warnings"] == ["context has no assistant message"]
+
+
+def test_clear_returns_status_data_without_printing(capsys):
+    memory = GitMemory()
+    memory.add_message("user", "a")
+
+    status = memory.clear()
+
+    assert status == memory.status_data()
+    assert status["head"] == 0
+    assert status["commit_count"] == 1
+    assert capsys.readouterr().out == ""

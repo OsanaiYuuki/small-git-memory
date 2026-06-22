@@ -121,6 +121,16 @@ def print_diff(changes):
         print(prefix, change["role"] + ":", change["content"])
 
 
+def print_validation(result):
+    for error in result["errors"]:
+        print("error:", error)
+
+    for warning in result["warnings"]:
+        print("warning:", warning)
+
+    print("context validation finished")
+
+
 def run_cli(memory):
     while True:
         try:
@@ -160,7 +170,7 @@ def run_cli(memory):
             print_tree(memory)
 
         elif command == "validate":
-            memory.validate_context()
+            print_validation(memory.validate_context())
 
         elif parts[0] == "diff":
             if len(parts) == 1:
@@ -222,7 +232,12 @@ def run_cli(memory):
                 print("index must be a number")
                 continue
 
-            memory.remove_message(index)
+            try:
+                removed_message = memory.remove_message(index)
+            except ValueError as error:
+                print(error)
+                continue
+            print("remove:", removed_message.role + ":", removed_message.content)
 
         elif parts[0] == "snapshot":
             if len(parts) < 2:
@@ -295,6 +310,7 @@ def run_cli(memory):
 
         elif command == "clear":
             memory.clear()
+            print("memory cleared")
 
         elif command == "all_clear":
             confirm = input("clear all memory? type yes to confirm: ")
@@ -302,6 +318,7 @@ def run_cli(memory):
             if confirm == "yes":
                 memory.clear()
                 save_memory(memory)
+                print("memory cleared")
             else:
                 print("all clear cancelled")
 
