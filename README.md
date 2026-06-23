@@ -51,6 +51,7 @@ small-git-memory 想做的就是这件小事：让这条“和模型一起走过
 - 导出 OpenAI messages JSON
 - 导入 OpenAI messages JSON
 - 导出 Markdown transcript
+- 在 status 里显示简单 token 估算
 - 自动创建 checkpoint snapshot
 - 查看 commit history
 - 查看树形 history
@@ -301,6 +302,7 @@ config.py          local config
 - Git-like commit tree
 - named branch
 - import / export messages
+- simple token usage summary
 - snapshot / rollback / undo
 - patch 生成与回放
 - 本地 JSON 存储
@@ -327,6 +329,7 @@ config.py          local config
 - [x] 实现原子保存，避免 JSON 写坏
 - [x] snapshot 支持 note，并在 log 中显示
 - [x] 支持简单 named branch / checkout
+- [x] 增加简单 token 统计
 - [x] 支持导入 / 导出 OpenAI 风格 messages
 - [x] 支持导出 Markdown transcript
 - [ ] 优化 CLI 命令命名和错误提示

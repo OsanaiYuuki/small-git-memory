@@ -126,6 +126,7 @@ def test_status_data_returns_summary_and_context():
     assert status["commit_count"] == len(memory.commits)
     assert status["snapshot_count"] == len(memory.snapshots)
     assert status["commits_since_snapshot"] == 1
+    assert status["tokens"] == memory.estimate_tokens()
     assert status["context"][-1] == {
         "index": 3,
         "role": "user",
@@ -157,6 +158,12 @@ def test_import_messages_replaces_context_and_commits():
         {"index": 1, "role": "system", "content": "be concise"},
         {"index": 2, "role": "user", "content": "hello"},
     ]
+
+
+def test_estimate_tokens_returns_simple_context_total():
+    memory = GitMemory()
+
+    assert memory.estimate_tokens() == 6
 
 
 def test_snapshot_rejects_duplicate_name():

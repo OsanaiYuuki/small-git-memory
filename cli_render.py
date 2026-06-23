@@ -80,6 +80,7 @@ def print_status(memory):
     print("current branch:", data["current_branch"])
     print("commit nodes:", data["commit_count"])
     print("snapshots:", data["snapshot_count"])
+    print("tokens:", data["tokens"])
 
     if data["commits_since_snapshot"] == 0:
         print("current HEAD is on a snapshot")

@@ -12,6 +12,11 @@ DEFAULT_CONTEXT = [
 ]
 
 
+def estimate_message_tokens(message: Message) -> int:
+    content_tokens = max(1, (len(message.content) + 3) // 4)
+    return content_tokens + 1
+
+
 class GitMemory:
     def __init__(self):
         self.snapshots = {}
@@ -136,6 +141,7 @@ class GitMemory:
             "commit_count": len(self.commits),
             "snapshot_count": len(self.snapshots),
             "commits_since_snapshot": self.commits_since_snapshots(),
+            "tokens": self.estimate_tokens(),
             "context": self.context_data(),
         }
 
@@ -151,6 +157,14 @@ class GitMemory:
             }
             for index, message in enumerate(self.context, start=1)
         ]
+
+    def estimate_tokens(self) -> int:
+        total = 0
+
+        for message in self.context:
+            total += estimate_message_tokens(message)
+
+        return total
 
     def log(self):
         return self.snapshot_log_data()
