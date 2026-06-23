@@ -269,6 +269,7 @@ tests/
   test_storage.py
 
 cli.py             interactive command parser
+cli_render.py      CLI output rendering helpers
 main.py            entry point
 config.py          local config
 ```
