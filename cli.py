@@ -5,6 +5,7 @@ from cli_render import (
     print_context,
     print_diff,
     print_history,
+    print_branches,
     print_snapshot_log,
     print_status,
     print_tree,
@@ -52,6 +53,9 @@ def run_cli(memory):
 
         elif command == "tree":
             print_tree(memory)
+
+        elif command == "branches":
+            print_branches(memory)
 
         elif command == "validate":
             print_validation(memory.validate_context())
@@ -136,6 +140,30 @@ def run_cli(memory):
                 print(error)
                 continue
             print(f"snapshot created: {snapshot.name} on node {snapshot.node_id}")
+
+        elif parts[0] == "branch":
+            if len(parts) < 2:
+                print("usage:branch<name>")
+                continue
+
+            try:
+                branch = memory.branch(parts[1])
+            except ValueError as error:
+                print(error)
+                continue
+            print(f"branch created: {branch['name']} on node {branch['head']}")
+
+        elif parts[0] == "checkout":
+            if len(parts) < 2:
+                print("usage:checkout<name>")
+                continue
+
+            try:
+                node_id = memory.checkout(parts[1])
+            except ValueError as error:
+                print(error)
+                continue
+            print(f"switched to branch {parts[1]} on node {node_id}")
 
         elif parts[0] == "delete_snapshot":
             if len(parts) < 2:

@@ -229,3 +229,90 @@ def test_clear_returns_status_data_without_printing(capsys):
     assert status["head"] == 0
     assert status["commit_count"] == 1
     assert capsys.readouterr().out == ""
+
+
+def test_initializes_main_branch_at_root():
+    memory = GitMemory()
+
+    assert memory.current_branch == "main"
+    assert memory.branches == {"main": 0}
+    assert memory.branches_data() == [
+        {"name": "main", "head": 0, "is_current": True},
+    ]
+
+
+def test_branch_creates_branch_at_current_head_without_checkout():
+    memory = GitMemory()
+    memory.add_message("user", "a")
+    head = memory.head
+
+    branch = memory.branch("idea")
+
+    assert branch == {"name": "idea", "head": head, "is_current": False}
+    assert memory.current_branch == "main"
+    assert memory.branches["idea"] == head
+
+
+def test_branch_rejects_duplicate_name():
+    memory = GitMemory()
+
+    with pytest.raises(ValueError, match="branch already exists"):
+        memory.branch("main")
+
+
+def test_branch_rejects_empty_name():
+    memory = GitMemory()
+
+    with pytest.raises(ValueError, match="branch name must be non-empty"):
+        memory.branch("")
+
+
+def test_checkout_moves_head_and_current_branch():
+    memory = GitMemory()
+    memory.add_message("user", "a")
+    idea_head = memory.head
+    memory.branch("idea")
+    memory.add_message("assistant", "b")
+
+    checked_out_id = memory.checkout("idea")
+
+    assert checked_out_id == idea_head
+    assert memory.head == idea_head
+    assert memory.current_branch == "idea"
+    assert memory.context[-1].content == "a"
+
+
+def test_checkout_rejects_missing_branch():
+    memory = GitMemory()
+
+    with pytest.raises(ValueError, match="branch not exist"):
+        memory.checkout("missing")
+
+
+def test_current_branch_moves_when_new_commit_is_created():
+    memory = GitMemory()
+    memory.add_message("user", "a")
+    memory.branch("idea")
+    memory.checkout("idea")
+
+    memory.add_message("assistant", "b")
+
+    assert memory.branches["idea"] == memory.head
+
+
+def test_rollback_does_not_move_branch_pointer_until_next_commit():
+    memory = GitMemory()
+    memory.add_message("user", "a")
+    old_head = memory.head
+    memory.add_message("assistant", "b")
+    branch_head = memory.head
+
+    memory.rollback(old_head)
+
+    assert memory.head == old_head
+    assert memory.branches["main"] == branch_head
+
+    memory.add_message("user", "branch from old head")
+
+    assert memory.branches["main"] == memory.head
+    assert memory.commits[memory.head].parent == old_head

@@ -19,6 +19,8 @@ class GitMemory:
         self.next_id = 0
         self.base = copy.deepcopy(DEFAULT_CONTEXT)
         self.context = copy.deepcopy(DEFAULT_CONTEXT)
+        self.branches = {}
+        self.current_branch = "main"
 
         self._create_root()
 
@@ -88,12 +90,44 @@ class GitMemory:
         node_id = self.snapshots[name].node_id
         return self.rollback(node_id)
 
+    def branch(self, name: str) -> dict:
+        if name == "":
+            raise ValueError("branch name must be non-empty")
+
+        if name in self.branches:
+            raise ValueError("branch already exists")
+
+        self.branches[name] = self.head
+        return {
+            "name": name,
+            "head": self.head,
+            "is_current": name == self.current_branch,
+        }
+
+    def checkout(self, name: str) -> int:
+        if name not in self.branches:
+            raise ValueError("branch not exist")
+
+        self.current_branch = name
+        return self.rollback(self.branches[name])
+
+    def branches_data(self) -> list[dict]:
+        return [
+            {
+                "name": name,
+                "head": head,
+                "is_current": name == self.current_branch,
+            }
+            for name, head in sorted(self.branches.items())
+        ]
+
     def status(self):
         return self.status_data()
 
     def status_data(self):
         return {
             "head": self.head,
+            "current_branch": self.current_branch,
             "commit_count": len(self.commits),
             "snapshot_count": len(self.snapshots),
             "commits_since_snapshot": self.commits_since_snapshots(),
@@ -191,6 +225,8 @@ class GitMemory:
     def clear(self):
         self.snapshots = {}
         self.commits = {}
+        self.branches = {}
+        self.current_branch = "main"
         self.next_id = 0
         self.base = copy.deepcopy(DEFAULT_CONTEXT)
         self.context = copy.deepcopy(DEFAULT_CONTEXT)
@@ -255,6 +291,7 @@ class GitMemory:
 
         self.next_id += 1
         self.head = new_id
+        self.branches[self.current_branch] = self.head
         self.base = copy.deepcopy(self.context)
 
     def _create_root(self):
@@ -268,6 +305,7 @@ class GitMemory:
         )
         self.next_id += 1
         self.head = root_id
+        self.branches[self.current_branch] = root_id
 
         self.snapshots["__root__"] = Snapshot(
             name="__root__",

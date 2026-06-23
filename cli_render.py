@@ -6,6 +6,9 @@ def help_info():
     print("  snapshot <name> [note]   save current context,save a snapshot")
     print("  delete_snapshot <name>   delete a snapshot")
     print("  auto                     auto create a snapshot")
+    print("  branch <name>            create a branch at current HEAD")
+    print("  checkout <name>          switch to a branch HEAD")
+    print("  branches                 show all branches")
     print("  rollback <node_id>       rollback to a commit node")
     print("  rollback_snapshot <name> rollback to a snapshot")
     print("  undo                     undo to parent node")
@@ -71,6 +74,7 @@ def print_status(memory):
     data = memory.status_data()
 
     print("HEAD node:", data["head"])
+    print("current branch:", data["current_branch"])
     print("commit nodes:", data["commit_count"])
     print("snapshots:", data["snapshot_count"])
 
@@ -122,3 +126,11 @@ def print_validation(result):
         print("warning:", warning)
 
     print("context validation finished")
+
+
+def print_branches(memory):
+    print("branches:")
+
+    for branch in memory.branches_data():
+        marker = "*" if branch["is_current"] else " "
+        print(f"{marker} {branch['name']} -> {branch['head']}")

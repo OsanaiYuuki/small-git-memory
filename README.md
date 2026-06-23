@@ -45,6 +45,9 @@ small-git-memory 想做的就是这件小事：让这条“和模型一起走过
 - undo 到父节点
 - 创建带 note 的 snapshot
 - 根据 snapshot 名字 rollback
+- 创建命名 branch
+- checkout 到某个 branch 的 HEAD
+- 查看所有 branch
 - 自动创建 checkpoint snapshot
 - 查看 commit history
 - 查看树形 history
@@ -198,6 +201,9 @@ remove <index>                    remove message by index
 snapshot <name> [note]            create a named snapshot with optional note
 delete_snapshot <name>            delete a snapshot
 auto                              auto create a checkpoint snapshot
+branch <name>                     create a branch at current HEAD
+checkout <name>                   switch to a branch HEAD
+branches                          show all branches
 rollback <node_id>                rollback to a commit node
 rollback_snapshot <name>          rollback to a snapshot
 undo                              undo to parent node
@@ -234,6 +240,8 @@ gitmemory.json
 - HEAD
 - commit tree
 - snapshots
+- branches
+- current branch
 - next id
 - storage version
 
@@ -283,6 +291,7 @@ config.py          local config
 已经比较完整的部分：
 
 - Git-like commit tree
+- named branch
 - snapshot / rollback / undo
 - patch 生成与回放
 - 本地 JSON 存储
@@ -309,6 +318,7 @@ config.py          local config
 - [x] 给存储数据增加 version 字段
 - [x] 实现原子保存，避免 JSON 写坏
 - [x] snapshot 支持 note，并在 log 中显示
+- [x] 支持简单 named branch / checkout
 - [ ] 优化 CLI 命令命名和错误提示
 - [ ] 拆分 `GitMemory` 的职责
 - [ ] 增加 token 统计

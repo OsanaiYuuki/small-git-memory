@@ -8,7 +8,9 @@ from core.storage import load_memory, memory_to_data, migrate_data, save_memory,
 def test_memory_to_data_has_version():
     m = GitMemory()
     data = memory_to_data(m)
-    assert data["version"] == 1
+    assert data["version"] == 2
+    assert data["branches"] == {"main": 0}
+    assert data["current_branch"] == "main"
 
 def test_memory_to_data_uses_string_commit_keys():
     m = GitMemory()
@@ -47,9 +49,43 @@ def test_migrate_v0_messages_to_cached_context():
 
     migrated = migrate_data(old_data)
 
-    assert migrated["version"] == 1
+    assert migrated["version"] == 2
     assert "cached_context" in migrated["snapshots"]["__root__"]
     assert "messages" not in migrated["snapshots"]["__root__"]
+    assert migrated["branches"] == {"main": 0}
+    assert migrated["current_branch"] == "main"
+
+
+def test_migrate_v1_to_v2_adds_branch_fields():
+    v1_data = {
+        "version": 1,
+        "context": [],
+        "base": [],
+        "head": 0,
+        "commits": {
+            "0": {
+                "id": 0,
+                "parent": None,
+                "patch": [],
+                "created_at": "time",
+            }
+        },
+        "snapshots": {
+            "__root__": {
+                "cached_context": [],
+                "created_at": "time",
+                "note": "",
+                "node_id": 0,
+            }
+        },
+        "next_id": 1,
+    }
+
+    migrated = migrate_data(v1_data)
+
+    assert migrated["version"] == 2
+    assert migrated["branches"] == {"main": 0}
+    assert migrated["current_branch"] == "main"
 
 
 def test_save_memory_writes_valid_json_without_tmp_file_and_can_load(monkeypatch, tmp_path):

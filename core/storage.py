@@ -13,7 +13,7 @@ from core.models import (
 )
 
 
-STORAGE_VERSION = 1
+STORAGE_VERSION = 2
 
 
 def save_memory(memory):
@@ -96,7 +96,17 @@ def validate_data(data):
         print("unsupported storage version:", version)
         return False
 
-    required_keys = ["version", "context", "base", "head", "commits", "snapshots", "next_id"]
+    required_keys = [
+        "version",
+        "context",
+        "base",
+        "head",
+        "commits",
+        "snapshots",
+        "next_id",
+        "branches",
+        "current_branch",
+    ]
 
     for key in required_keys:
         if key not in data:
@@ -119,8 +129,31 @@ def validate_data(data):
         print("next_id must be an int")
         return False
 
+    if not isinstance(data["branches"], dict):
+        print("branches must be a dict")
+        return False
+
+    if not isinstance(data["current_branch"], str):
+        print("current_branch must be a string")
+        return False
+
+    if data["current_branch"] not in data["branches"]:
+        print("current branch not exist")
+        return False
+
     if not validate_data_commits(data):
         return False
+
+    for name, node_id in data["branches"].items():
+        if not isinstance(name, str) or name == "":
+            print("branch name must be a non-empty string")
+            return False
+        if not isinstance(node_id, int):
+            print("branch head must be an int:", name)
+            return False
+        if str(node_id) not in data["commits"]:
+            print("branch points to missing node:", name)
+            return False
 
     if not validate_messages(data["context"]):
         return False
@@ -175,6 +208,8 @@ def memory_to_data(memory):
         "commits": commits,
         "snapshots": snapshots,
         "next_id": memory.next_id,
+        "branches": memory.branches,
+        "current_branch": memory.current_branch,
     }
 
 
@@ -187,6 +222,8 @@ def apply_data_to_memory(memory, data):
     }
     memory.next_id = data["next_id"]
     memory.commits = {int(k): commit_from_data(v) for k, v in data["commits"].items()}
+    memory.branches = {name: node_id for name, node_id in data["branches"].items()}
+    memory.current_branch = data["current_branch"]
 
 
 def validate_data_commits(data):
@@ -235,22 +272,29 @@ def get_storage_version(data):
 
 def migrate_data(data):
     version = data.get("version", 0)
+    migrated = dict(data)
 
     if version == STORAGE_VERSION:
-        return data
+        return migrated
 
     if version == 0:
-        migrated = dict(data)
         migrated["version"] = 1
 
         snapshots = {}
-        for name, snapshot in data["snapshots"].items():
+        for name, snapshot in migrated["snapshots"].items():
             new_snapshot = dict(snapshot)
             if "cached_context" not in new_snapshot and "messages" in new_snapshot:
                 new_snapshot["cached_context"] = new_snapshot.pop("messages")
             snapshots[name] = new_snapshot
 
         migrated["snapshots"] = snapshots
+        version = 1
+
+    if version == 1:
+        migrated["version"] = 2
+        migrated["branches"] = {"main": migrated["head"]}
+        migrated["current_branch"] = "main"
+
         return migrated
 
     print("unsupported storage version:", version)
