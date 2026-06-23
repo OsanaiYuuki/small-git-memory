@@ -1,7 +1,11 @@
 import builtins
+import json
 from types import SimpleNamespace
 
+import pytest
+
 from cli import run_cli
+from core.models import Message
 
 
 class FakeMemory:
@@ -49,6 +53,10 @@ class FakeMemory:
             {"name": "main", "head": 0, "is_current": True},
             {"name": "idea", "head": 7, "is_current": False},
         ]
+
+    def import_messages(self, messages):
+        self.imported_messages = messages
+        return len(messages)
 
 
 def test_cli_diff_nodes_parses_ids(monkeypatch):
@@ -178,3 +186,49 @@ def test_cli_branches_prints_branch_list(monkeypatch, capsys):
     assert "branches:" in output
     assert "* main -> 0" in output
     assert "  idea -> 7" in output
+
+
+@pytest.mark.parametrize("command_format, suffix", [("openai", ".json"), ("markdown", ".md")])
+def test_cli_export_writes_messages(monkeypatch, tmp_path, capsys, command_format, suffix):
+    memory = FakeMemory()
+    memory.context = [Message("user", "hello")]
+    path = tmp_path / f"messages{suffix}"
+    commands = iter([f"export {command_format} {path}", "exit"])
+
+    monkeypatch.setattr(builtins, "input", lambda _: next(commands))
+
+    run_cli(memory)
+
+    output = capsys.readouterr().out
+    assert f"exported {command_format} messages to {path}" in output
+    assert path.exists()
+
+
+def test_cli_export_openai_writes_json(monkeypatch, tmp_path):
+    memory = FakeMemory()
+    memory.context = [Message("user", "hello")]
+    path = tmp_path / "messages.json"
+    commands = iter([f"export openai {path}", "exit"])
+
+    monkeypatch.setattr(builtins, "input", lambda _: next(commands))
+
+    run_cli(memory)
+
+    assert json.loads(path.read_text(encoding="utf-8")) == [
+        {"role": "user", "content": "hello"},
+    ]
+
+
+def test_cli_import_openai_reads_messages(monkeypatch, tmp_path, capsys):
+    memory = FakeMemory()
+    path = tmp_path / "messages.json"
+    path.write_text('[{"role": "user", "content": "hello"}]', encoding="utf-8")
+    commands = iter([f"import openai {path}", "exit"])
+
+    monkeypatch.setattr(builtins, "input", lambda _: next(commands))
+
+    run_cli(memory)
+
+    output = capsys.readouterr().out
+    assert memory.imported_messages == [Message("user", "hello")]
+    assert f"imported 1 messages from {path}" in output

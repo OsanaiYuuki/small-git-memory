@@ -142,6 +142,23 @@ def test_context_data_returns_message_dicts():
     ]
 
 
+def test_import_messages_replaces_context_and_commits():
+    memory = GitMemory()
+    old_head = memory.head
+
+    count = memory.import_messages([
+        {"role": "system", "content": "be concise"},
+        {"role": "user", "content": "hello"},
+    ])
+
+    assert count == 2
+    assert memory.head != old_head
+    assert memory.context_data() == [
+        {"index": 1, "role": "system", "content": "be concise"},
+        {"index": 2, "role": "user", "content": "hello"},
+    ]
+
+
 def test_snapshot_rejects_duplicate_name():
     memory = GitMemory()
     memory.snapshot("mark")

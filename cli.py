@@ -1,4 +1,5 @@
 from core.git_memory import GitMemory
+from core.messages_io import read_openai_messages, write_markdown_messages, write_openai_messages
 from core.storage import load_memory, save_memory
 from cli_render import (
     help_info,
@@ -164,6 +165,44 @@ def run_cli(memory):
                 print(error)
                 continue
             print(f"switched to branch {parts[1]} on node {node_id}")
+
+        elif parts[0] == "export":
+            if len(parts) != 3:
+                print("usage: export <openai|markdown> <file>")
+                continue
+
+            export_format = parts[1]
+            path = parts[2]
+
+            try:
+                if export_format == "openai":
+                    write_openai_messages(path, memory.context)
+                elif export_format == "markdown":
+                    write_markdown_messages(path, memory.context)
+                else:
+                    print("unknown export format:", export_format)
+                    continue
+            except OSError as error:
+                print(error)
+                continue
+
+            print(f"exported {export_format} messages to {path}")
+
+        elif parts[0] == "import":
+            if len(parts) != 3 or parts[1] != "openai":
+                print("usage: import openai <file>")
+                continue
+
+            path = parts[2]
+
+            try:
+                messages = read_openai_messages(path)
+                count = memory.import_messages(messages)
+            except (OSError, ValueError, TypeError) as error:
+                print(error)
+                continue
+
+            print(f"imported {count} messages from {path}")
 
         elif parts[0] == "delete_snapshot":
             if len(parts) < 2:

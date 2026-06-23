@@ -48,6 +48,9 @@ small-git-memory 想做的就是这件小事：让这条“和模型一起走过
 - 创建命名 branch
 - checkout 到某个 branch 的 HEAD
 - 查看所有 branch
+- 导出 OpenAI messages JSON
+- 导入 OpenAI messages JSON
+- 导出 Markdown transcript
 - 自动创建 checkpoint snapshot
 - 查看 commit history
 - 查看树形 history
@@ -204,6 +207,9 @@ auto                              auto create a checkpoint snapshot
 branch <name>                     create a branch at current HEAD
 checkout <name>                   switch to a branch HEAD
 branches                          show all branches
+export openai <file>              export current context as OpenAI messages JSON
+import openai <file>              import OpenAI messages JSON
+export markdown <file>            export current context as Markdown
 rollback <node_id>                rollback to a commit node
 rollback_snapshot <name>          rollback to a snapshot
 undo                              undo to parent node
@@ -263,6 +269,7 @@ gitmemory.json
 core/
   diff.py          LCS diff and display
   git_memory.py    main memory kernel
+  messages_io.py   import/export helpers for OpenAI JSON and Markdown
   models.py        dataclasses and data conversion
   patch.py         make/apply/undo patch
   storage.py       JSON storage, migration, validation, atomic save
@@ -271,6 +278,7 @@ tests/
   test_cli.py
   test_gitmemory_tree.py
   test_make_patch.py
+  test_messages_io.py
   test_patch.py
   test_record.py
   test_rollback.py
@@ -292,6 +300,7 @@ config.py          local config
 
 - Git-like commit tree
 - named branch
+- import / export messages
 - snapshot / rollback / undo
 - patch 生成与回放
 - 本地 JSON 存储
@@ -304,7 +313,6 @@ config.py          local config
 - CLI 交互体验还很朴素
 - `GitMemory` 类职责偏多，后续可以继续拆
 - 目前还没有真实接入 LLM provider
-- 还没有 token 统计
 - 还没有图形化 history tree
 - 没有并发写入保护
 
@@ -319,10 +327,11 @@ config.py          local config
 - [x] 实现原子保存，避免 JSON 写坏
 - [x] snapshot 支持 note，并在 log 中显示
 - [x] 支持简单 named branch / checkout
+- [x] 支持导入 / 导出 OpenAI 风格 messages
+- [x] 支持导出 Markdown transcript
 - [ ] 优化 CLI 命令命名和错误提示
 - [ ] 拆分 `GitMemory` 的职责
-- [ ] 增加 token 统计
-- [ ] 支持导入 / 导出 OpenAI 或 Claude 风格 messages
+- [ ] 支持 Claude 风格 messages
 - [ ] 接入真实 LLM provider
 - [ ] 探索可视化历史树
 

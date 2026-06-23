@@ -2,7 +2,7 @@ import copy
 from datetime import datetime
 
 from core.diff import diff_data
-from core.models import CommitNode, Message, Snapshot
+from core.models import CommitNode, Message, Snapshot, messages_from_data
 from core.patch import apply_patch, make_patch
 
 
@@ -41,6 +41,11 @@ class GitMemory:
         removed_message = self.context.pop(real_index)
         self.commit()
         return removed_message
+
+    def import_messages(self, messages) -> int:
+        self.context = messages_from_data(messages)
+        self.commit()
+        return len(self.context)
 
     def snapshot(self, name: str, note: str = "") -> Snapshot:
         if name in self.snapshots:
